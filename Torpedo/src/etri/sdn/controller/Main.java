@@ -70,6 +70,8 @@ public class Main {
 		}
 
 		tcp_server.start();
+		
+		Logger.stdout("hello world");
 
 		Logger.stdout("started...");
 
