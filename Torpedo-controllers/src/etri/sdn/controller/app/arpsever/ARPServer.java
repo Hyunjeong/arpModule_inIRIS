@@ -10,17 +10,19 @@ import org.openflow.protocol.OFType;
 import etri.sdn.controller.MessageContext;
 import etri.sdn.controller.OFController;
 import etri.sdn.controller.OFModule;
+import etri.sdn.controller.module.arpcontrol.OFMArpControl;
 import etri.sdn.controller.module.learningmac.OFMLearningMac;
 import etri.sdn.controller.module.linkdiscovery.OFMLinkDiscovery;
 import etri.sdn.controller.protocol.io.Connection;
 
 public class ARPServer extends OFController{
 	
-	private OFMLearningMac m_learning_mac = new OFMLearningMac();
+
 	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
+	private OFMArpControl m_arp_control = new OFMArpControl();
 	
 	private OFModule[] packet_in_pipeline = { 
-			m_learning_mac,
+			m_arp_control,
 			m_link_discovery
 	};
 	
@@ -32,7 +34,7 @@ public class ARPServer extends OFController{
 	@Override
 	public void init() {
 		// TODO Auto-generated method stub
-		m_learning_mac.init(this);
+		m_arp_control.init(this);
 		m_link_discovery.init(this);
 	}
 
