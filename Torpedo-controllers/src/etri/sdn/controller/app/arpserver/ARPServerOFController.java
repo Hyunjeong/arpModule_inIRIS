@@ -10,6 +10,7 @@ import org.openflow.protocol.OFType;
 import etri.sdn.controller.MessageContext;
 import etri.sdn.controller.OFController;
 import etri.sdn.controller.OFModule;
+import etri.sdn.controller.module.arpcontrol.OFMArpControl;
 import etri.sdn.controller.module.devicemanager.OFMDefaultEntityClassifier;
 import etri.sdn.controller.module.devicemanager.OFMDeviceManager;
 import etri.sdn.controller.module.learningmac.OFMLearningMac;
@@ -38,9 +39,9 @@ import etri.sdn.controller.protocol.io.Connection;
  */
 public class ARPServerOFController extends OFController {
 
+	/**
 	private OFMUserInterface m_user_interface = new OFMUserInterface();
 	private OFMLearningMac m_learning_mac = new OFMLearningMac();
-	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
 	private OFMTopologyManager m_topology_manager = new OFMTopologyManager();
 	private OFMDefaultEntityClassifier m_entity_classifier = new OFMDefaultEntityClassifier();
 	private OFMDeviceManager m_device_manager = new OFMDeviceManager();
@@ -48,12 +49,21 @@ public class ARPServerOFController extends OFController {
 	private OFMStaticFlowEntryPusher m_static_entry_pusher = new OFMStaticFlowEntryPusher();
 	private OFMStorageManager m_storage_manager = new OFMStorageManager();
 	
+		**/
+	
+	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
+	
+	
+	
+	private OFMArpControl m_arp_control = new OFMArpControl();
+	
 	private OFModule[] packet_in_pipeline = { 
-			m_learning_mac,
+			m_arp_control,
+	//		m_learning_mac,
 			m_link_discovery, 
-			m_topology_manager,
-			m_entity_classifier, 
-			m_device_manager
+	//		m_topology_manager,
+	//		m_entity_classifier, 
+	//		m_device_manager
 	};
 
 	public ARPServerOFController(int num_of_queue, String role) {
@@ -66,15 +76,16 @@ public class ARPServerOFController extends OFController {
 	 */
 	@Override
 	public void init() {
-		m_learning_mac.init(this);
+		m_arp_control.init(this);
+//		m_learning_mac.init(this);
 		m_link_discovery.init(this);
-		m_topology_manager.init(this);
-		m_entity_classifier.init(this);
-		m_device_manager.init(this);
-		m_state_manager.init(this);			// this is not a part of the pipeline.
-		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.
-		m_user_interface.init(this);		// this is not a part of the pipeline.
-		m_storage_manager.init(this);		// this is not a part of the pipeline.
+//		m_topology_manager.init(this);
+//		m_entity_classifier.init(this);
+//		m_device_manager.init(this);
+//		m_state_manager.init(this);			// this is not a part of the pipeline.
+//		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//
+//		m_user_interface.init(this);		// this is not a part of the pipeline.
+//		m_storage_manager.init(this);		// this is not a part of the pipeline.
 	}
 
 	/**

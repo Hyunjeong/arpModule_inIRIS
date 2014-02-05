@@ -26,6 +26,7 @@ import etri.sdn.controller.module.learningmac.MacVlanPair;
 import etri.sdn.controller.protocol.io.Connection;
 import etri.sdn.controller.protocol.io.IOFSwitch;
 import etri.sdn.controller.protocol.packet.Ethernet;
+import etri.sdn.controller.protocol.packet.IPv4;
 import etri.sdn.controller.util.Logger;
 
 /**
@@ -318,6 +319,29 @@ public final class OFMArpControl extends OFModule {
 		match.loadFromPacket(pi.getPacketData(), pi.getInPort());
 		Long sourceMac = Ethernet.toLong(match.getDataLayerSource());
 		Long destMac = Ethernet.toLong(match.getDataLayerDestination());
+		
+		
+		if(match.getDataLayerType() == 0x0806){
+			Logger.stdout("ARP ¸Â´Ù!!!!");
+			
+			System.out.println(match);
+			
+			/*
+			String sIP = IPv4.fromIPv4Address(match.getNetworkSource());
+			String dIP = IPv4.fromIPv4Address(match.getNetworkDestination());
+			
+			byte type = match.getNetworkProtocol();
+			
+			
+			Logger.stdout("source IP : " + sIP + " " + "destIP : " + dIP);
+			Logger.stdout("sMAC:"+sourceMac +"  "+ "dMAC: "+ match.setDataLayerDestination(match.getDataLayerDestination()));
+			System.out.println("opcode:" +type);
+			*/
+		}
+						
+		
+			
+		
 		Short vlan = match.getDataLayerVirtualLan();
 		if ((destMac & 0xfffffffffff0L) == 0x0180c2000000L) {
 			return true;
