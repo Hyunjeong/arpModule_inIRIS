@@ -41,26 +41,24 @@ public class ARPServerOFController extends OFController {
 
 	/**
 	private OFMUserInterface m_user_interface = new OFMUserInterface();
-	private OFMLearningMac m_learning_mac = new OFMLearningMac();
 	private OFMTopologyManager m_topology_manager = new OFMTopologyManager();
 	private OFMDefaultEntityClassifier m_entity_classifier = new OFMDefaultEntityClassifier();
 	private OFMDeviceManager m_device_manager = new OFMDeviceManager();
 	private OFMStateManager m_state_manager = new OFMStateManager();
 	private OFMStaticFlowEntryPusher m_static_entry_pusher = new OFMStaticFlowEntryPusher();
-	private OFMStorageManager m_storage_manager = new OFMStorageManager();
+	**/
 	
-		**/
+//	private OFMLearningMac m_learning_mac = new OFMLearningMac();
 	
 	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
-	
-	
-	
 	private OFMArpControl m_arp_control = new OFMArpControl();
+	private OFMStorageManager m_storage_manager = new OFMStorageManager();	
+
 	
 	private OFModule[] packet_in_pipeline = { 
 			m_arp_control,
-	//		m_learning_mac,
 			m_link_discovery, 
+	//		m_learning_mac,
 	//		m_topology_manager,
 	//		m_entity_classifier, 
 	//		m_device_manager
@@ -85,7 +83,7 @@ public class ARPServerOFController extends OFController {
 //		m_state_manager.init(this);			// this is not a part of the pipeline.
 //		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//
 //		m_user_interface.init(this);		// this is not a part of the pipeline.
-//		m_storage_manager.init(this);		// this is not a part of the pipeline.
+		m_storage_manager.init(this);		// this is not a part of the pipeline.
 	}
 
 	/**

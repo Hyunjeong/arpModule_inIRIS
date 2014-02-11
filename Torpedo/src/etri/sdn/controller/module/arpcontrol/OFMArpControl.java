@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +44,7 @@ public final class OFMArpControl extends OFModule {
 	 * Table to save learning result.
 	 */
 	private Map<IOFSwitch, Map<MacVlanPair, Short>> macVlanToSwitchPortMap = new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair, Short>>();
+
 	// flow-mod - for use in the cookie
 	private static final int LEARNING_SWITCH_APP_ID = 1;
 	private static final int APP_ID_BITS = 12;
@@ -54,6 +56,7 @@ public final class OFMArpControl extends OFModule {
 	private static final short PRIORITY_DEFAULT = 100;
 	// normally, setup reverse flow as well.
 	private static final boolean LEARNING_SWITCH_REVERSE_FLOW = true;
+
 	private static final int MAX_MACS_PER_SWITCH = 1000;
 
 	@Override
@@ -86,6 +89,10 @@ public final class OFMArpControl extends OFModule {
 	protected boolean addEntry(byte[] IP, byte MAC) {
 		return true;
 	}
+
+	
+	private Map<String, Object> arptable = new HashMap<String, Object>();
+
 
 	/**
 	 * Writes an OFPacketOut message to a switch.
@@ -142,14 +149,6 @@ public final class OFMArpControl extends OFModule {
 		// TODO: counter store support
 		// counterStore.updatePktOutFMCounterStore(sw, packetOutMessage);
 		out.add(packetOutMessage);
-	}
-
-	/**
-	 * Constructor to create learning mac module instance. It does nothing
-	 * internally.
-	 */
-	public OFMArpControl() {
-		// does nothing
 	}
 
 	/**
@@ -321,6 +320,7 @@ public final class OFMArpControl extends OFModule {
 		byte[] packetData = pi.getPacketData();
 
 		OFMatch match = new OFMatch();
+
 		match.loadFromPacket(pi.getPacketData(), pi.getInPort());
 
 		Long sourceMac = Ethernet.toLong(match.getDataLayerSource());
@@ -352,7 +352,17 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setSenderProtocolAddress(sourceIP);
 			arpPacket.setTargetHardwareAddress(destinationMAC);
 			arpPacket.setTargetProtocolAddress(destinationIP);
-
+/*
+			if(arptable.containsValue(destIP)){
+				System.out.println(dMAC);
+			}
+				else{
+					System.out.println("ARP reply ÇÊ¿ä");
+				}
+					
+			return false;
+			*/
+			
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
 				// ARP request msg
@@ -465,8 +475,19 @@ public final class OFMArpControl extends OFModule {
 			}
 		}
 
-		return true;
+
+		match.loadFromPacket(pi.getPacketData(), pi.getInPort());		
+		
+		/**
+		 * Process a ARP packet. Extraction MAC and IP address to store hashmap
+		 */
+		
+		return false;
+
+
 	}
+									
+
 
 	public static String ipToString(int ip) {
 		return Integer.toString(U8.f((byte) ((ip & 0xff000000) >> 24))) + "."
@@ -487,6 +508,11 @@ public final class OFMArpControl extends OFModule {
 
 		return str;
 	}
+	/**
+	 * Initialize this module. As this module processes all PACKET_IN messages,
+	 * it registers filter to receive those messages.
+	 */
+	
 
 	@Override
 	protected boolean handleDisconnect(Connection conn) {
