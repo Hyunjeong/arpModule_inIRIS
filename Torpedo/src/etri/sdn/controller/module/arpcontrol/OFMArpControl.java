@@ -2,11 +2,11 @@ package etri.sdn.controller.module.arpcontrol;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
+import org.omg.CORBA.PRIVATE_MEMBER;
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMessage;
@@ -16,17 +16,14 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
-import org.openflow.util.LRULinkedHashMap;
+import org.openflow.util.HexString;
 
 import etri.sdn.controller.MessageContext;
 import etri.sdn.controller.OFMFilter;
 import etri.sdn.controller.OFModel;
 import etri.sdn.controller.OFModule;
-import etri.sdn.controller.module.learningmac.MacVlanPair;
 import etri.sdn.controller.protocol.io.Connection;
 import etri.sdn.controller.protocol.io.IOFSwitch;
-import etri.sdn.controller.protocol.packet.Ethernet;
-import etri.sdn.controller.protocol.packet.IPv4;
 import etri.sdn.controller.util.Logger;
 
 /**
@@ -38,12 +35,7 @@ import etri.sdn.controller.util.Logger;
  */
 public final class OFMArpControl extends OFModule {
 
-	/**
-	 * Table to save learning result.
-	 */
-	private Map<IOFSwitch, Map<MacVlanPair, Short>> macVlanToSwitchPortMap =
-		new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair, Short>>();
-
+	
 	// flow-mod - for use in the cookie
 	private static final int LEARNING_SWITCH_APP_ID = 1;
 	private static final int APP_ID_BITS = 12;
@@ -56,6 +48,9 @@ public final class OFMArpControl extends OFModule {
 	// normally, setup reverse flow as well. 
 	private static final boolean LEARNING_SWITCH_REVERSE_FLOW = true;
 	private static final int MAX_MACS_PER_SWITCH  = 1000; 
+	
+	
+	private Map<String, Object> arptable = new HashMap<String, Object>();
 
 	/**
 	 * Constructor to create learning mac module instance. 
@@ -65,92 +60,7 @@ public final class OFMArpControl extends OFModule {
 		// does nothing
 	}
 
-	/**
-	 * Adds a host to the MAC/VLAN->SwitchPort mapping
-	 * @param sw The switch to add the mapping to
-	 * @param mac The MAC address of the host to add
-	 * @param vlan The VLAN that the host is on
-	 * @param portVal The switchport that the host is on
-	 */
-	protected void addToPortMap(IOFSwitch sw, long mac, short vlan, short portVal) {
-		Map<MacVlanPair,Short> swMap = macVlanToSwitchPortMap.get(sw);
-
-		if (vlan == (short) 0xffff) {
-			// OFMatch.loadFromPacket sets VLAN ID to 0xffff if the packet contains no VLAN tag;
-			// for our purposes that is equivalent to the default VLAN ID 0
-			vlan = 0;
-		}
-		
-		if (swMap == null) {
-			// May be accessed by REST API so we need to make it thread safe
-//			swMap = new ConcurrentHashMap<MacVlanPair,Short>();
-			swMap = Collections.synchronizedMap(new LRULinkedHashMap<MacVlanPair,Short>(MAX_MACS_PER_SWITCH));
-			macVlanToSwitchPortMap.put(sw, swMap);
-		}
-		swMap.put(new MacVlanPair(mac, vlan, sw), portVal);
-	}
-
-	/**
-	 * Removes a host from the MAC/VLAN->SwitchPort mapping
-	 * @param sw The switch to remove the mapping from
-	 * @param mac The MAC address of the host to remove
-	 * @param vlan The VLAN that the host is on
-	 */
-	protected void removeFromPortMap(IOFSwitch sw, long mac, short vlan) {
-		if (vlan == (short) 0xffff) {
-			vlan = 0;
-		}
-		
-		Map<MacVlanPair,Short> swMap = macVlanToSwitchPortMap.get(sw);
-		if (swMap != null)
-			swMap.remove(new MacVlanPair(mac, vlan, sw));
-	}
-
-	/**
-	 * Get the port that a MAC/VLAN pair is associated with
-	 * @param sw The switch to get the mapping from
-	 * @param mac The MAC address to get
-	 * @param vlan The VLAN number to get
-	 * @return The port the host is on
-	 */
-	public Short getFromPortMap(IOFSwitch sw, long mac, short vlan) {
-		if (vlan == (short) 0xffff) {
-			vlan = 0;
-		}
-		
-		Map<MacVlanPair,Short> swMap = macVlanToSwitchPortMap.get(sw);
-		if (swMap != null)
-			return swMap.get(new MacVlanPair(mac, vlan, sw));
-
-		// if none found
-		return null;
-	}
-
-	/**
-	 * Clears the MAC/VLAN -> SwitchPort map for all switches
-	 */
-	public void clearLearnedTable() {
-		macVlanToSwitchPortMap.clear();
-	}
-
-	/**
-	 * Clears the MAC/VLAN -> SwitchPort map for a single switch
-	 * @param sw The switch to clear the mapping for
-	 */
-	public void clearLearnedTable(IOFSwitch sw) {
-		Map<MacVlanPair, Short> swMap = macVlanToSwitchPortMap.get(sw);
-		if (swMap != null)
-			swMap.clear();
-	}
-
-	/**
-	 * Get all the mappings between MAC/VLAN to switch port.
-	 * 
-	 * @return	Map<IOFSwitch, Map<MacVlanPair,Short>> object
-	 */
-	public synchronized Map<IOFSwitch, Map<MacVlanPair,Short>> getTable() {
-		return macVlanToSwitchPortMap;
-	}
+	
 
 	/**
 	 * Writes a OFFlowMod to a switch.
@@ -316,95 +226,49 @@ public final class OFMArpControl extends OFModule {
 
 		// Read in packet data headers by using OFMatch
 		OFMatch match = new OFMatch();
-		match.loadFromPacket(pi.getPacketData(), pi.getInPort());
-		Long sourceMac = Ethernet.toLong(match.getDataLayerSource());
-		Long destMac = Ethernet.toLong(match.getDataLayerDestination());
+		match.loadFromPacket(pi.getPacketData(), pi.getInPort());		
 		
+		/**
+		 * Process a ARP packet. Extraction MAC and IP address to store hashmap
+		 */
+		
+		String sMAC = null, dMAC = null, sourceIP = null, destIP = null;
+			
 		
 		if(match.getDataLayerType() == 0x0806){
-			Logger.stdout("ARP 맞다!!!!");
 			
-			System.out.println(match);
-			
-			/*
-			String sIP = IPv4.fromIPv4Address(match.getNetworkSource());
-			String dIP = IPv4.fromIPv4Address(match.getNetworkDestination());
-			
-			byte type = match.getNetworkProtocol();
-			
-			
-			Logger.stdout("source IP : " + sIP + " " + "destIP : " + dIP);
-			Logger.stdout("sMAC:"+sourceMac +"  "+ "dMAC: "+ match.setDataLayerDestination(match.getDataLayerDestination()));
-			System.out.println("opcode:" +type);
-			*/
-		}
+//			Logger.stdout("ARP 맞다!!");
 						
-		
+			sMAC = HexString.toHexString(match.getDataLayerSource());
+			dMAC = HexString.toHexString(match.getDataLayerDestination());
 			
+			sourceIP = OFMatch.ipToString(match.getNetworkSource());
+			destIP = OFMatch.ipToString(match.getNetworkDestination());
+			
+//			Logger.stdout("sourceMAC: " +sMAC+", destMAC: "+dMAC);
+//			Logger.stdout("sourceIP: "+sourceIP+", destIP: "+destIP);		
+		}
 		
-		Short vlan = match.getDataLayerVirtualLan();
-		if ((destMac & 0xfffffffffff0L) == 0x0180c2000000L) {
-			return true;
-		}
-		if ((sourceMac & 0x010000000000L) == 0) {
-			// If source MAC is a unicast address, learn the port for this MAC/VLAN
-			this.addToPortMap(conn.getSwitch(), sourceMac, vlan, pi.getInPort());
-		}
+		arptable.put(sMAC, sourceIP);
+//		arptable.put(dMAC, destIP);
 
-		// Now output flow-mod and/or packet
-		Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
-		if (outPort == null) {
-			// If we haven't learned the port for the dest MAC/VLAN, flood it
-			// Don't flood broadcast packets if the broadcast is disabled.
-			// XXX For LearningSwitch this doesn't do much. The sourceMac is removed
-			//     from port map whenever a flow expires, so you would still see
-			//     a lot of floods.
-			this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out);
-		} else if (outPort == match.getInputPort()) {
-			// ignore this packet.
-			//            log.trace("ignoring packet that arrived on same port as learned destination:"
-			//                    + " switch {} vlan {} dest MAC {} port {}",
-			//                    new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort });
-		} else {
-			// Add flow table entry matching source MAC, dest MAC, VLAN and input port
-			// that sends to the port we previously learned for the dest MAC/VLAN.  Also
-			// add a flow table entry with source and destination MACs reversed, and
-			// input and output ports reversed.  When either entry expires due to idle
-			// timeout, remove the other one.  This ensures that if a device moves to
-			// a different port, a constant stream of packets headed to the device at
-			// its former location does not keep the stale entry alive forever.
-			// FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we have to match on
-			// NW_SRC and NW_DST as well
-			match.setWildcards(
-					((Integer)conn.getSwitch().getAttribute(IOFSwitch.PROP_FASTWILDCARDS)).intValue()
-					& ~OFMatch.OFPFW_IN_PORT
-					& ~OFMatch.OFPFW_DL_VLAN & ~OFMatch.OFPFW_DL_SRC & ~OFMatch.OFPFW_DL_DST
-					& ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK
-			);
-			this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, pi.getBufferId(), match, outPort, out);
-			if (LEARNING_SWITCH_REVERSE_FLOW) {
-				this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, -1, match.clone()
-						.setDataLayerSource(match.getDataLayerDestination())
-						.setDataLayerDestination(match.getDataLayerSource())
-						.setNetworkSource(match.getNetworkDestination())
-						.setNetworkDestination(match.getNetworkSource())
-						.setTransportSource(match.getTransportDestination())
-						.setTransportDestination(match.getTransportSource())
-						.setInputPort(outPort),
-						match.getInputPort(),
-						out
-				);
-			}
+		if(arptable.containsValue(destIP)){
+			System.out.println(dMAC);
 		}
-		return true;
+			else{
+				System.out.println("ARP reply 필요");
+			}
+				
+		return false;
 	}
+									
 
 	/**
 	 * Initialize this module. As this module processes all PACKET_IN messages,
 	 * it registers filter to receive those messages.
 	 */
 	@Override
-	protected void initialize() {
+	protected void initialize() {	
 		registerFilter(
 				OFType.PACKET_IN,
 				new OFMFilter() {

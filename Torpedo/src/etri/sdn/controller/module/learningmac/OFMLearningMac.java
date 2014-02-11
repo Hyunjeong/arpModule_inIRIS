@@ -16,6 +16,7 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.util.HexString;
 import org.openflow.util.LRULinkedHashMap;
 
 import etri.sdn.controller.MessageContext;
@@ -318,6 +319,7 @@ public final class OFMLearningMac extends OFModule {
 		Long sourceMac = Ethernet.toLong(match.getDataLayerSource());
 		Long destMac = Ethernet.toLong(match.getDataLayerDestination());
 		Short vlan = match.getDataLayerVirtualLan();
+		
 		if ((destMac & 0xfffffffffff0L) == 0x0180c2000000L) {
 			return true;
 		}
