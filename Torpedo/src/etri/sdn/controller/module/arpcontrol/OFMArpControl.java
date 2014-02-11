@@ -91,6 +91,18 @@ public final class OFMArpControl extends OFModule {
 	protected boolean addEntry(byte[] IP, byte MAC) {
 		return true;
 	}
+	
+	
+	private void addToARPTable(byte[] sourceMAC, byte[] sourceIP) {
+
+	}
+	
+	
+	private void lookupARPTable(byte[] destinationIP) {
+		
+	}
+
+	
 
 	
 
@@ -357,6 +369,7 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setTargetProtocolAddress(destinationIP);
 			
 			addToARPTable(sourceMAC, sourceIP);
+			lookupARPTable(destinationIP);
 			
 			
 	
@@ -375,11 +388,19 @@ public final class OFMArpControl extends OFModule {
 			if (!arpPacket.isGratuitous()) {
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
-					
+					// ARP lookup
+						// yes
+							// arp reply 만들고 
+							// flow rule을 switch에 보내고
+							// reply packet 전송
+						// no
+							// request msg를 브로드캐스트
+								
 				}
 				// ARP reply msg
 				else if (opCode == ARP.OP_REPLY) {
-
+					// reply 수신 시, ARP table 업데이트
+					// reply msg 전달
 				}
 			}
 			// gratuitous ARP msg
@@ -494,8 +515,6 @@ public final class OFMArpControl extends OFModule {
 
 
 	}
-									
-
 
 	public static String ipToString(int ip) {
 		return Integer.toString(U8.f((byte) ((ip & 0xff000000) >> 24))) + "."
