@@ -3,7 +3,6 @@ package etri.sdn.controller.module.arpcontrol;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +18,6 @@ import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
 import org.openflow.util.HexString;
-import org.openflow.util.LRULinkedHashMap;
 import org.openflow.util.U8;
 
 import etri.sdn.controller.MessageContext;
@@ -326,7 +324,8 @@ public final class OFMArpControl extends OFModule {
 			
 			System.out.println(sMAC+"  "+dMAC);
 			
-
+			byte[] sourceMACB = HexString.fromHexString(sMAC);
+			
 
 			/*
 			 * System.out.print("opcode : " + opCode);
@@ -342,8 +341,6 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setTargetHardwareAddress(destinationMAC);
 			arpPacket.setTargetProtocolAddress(destinationIP);
 			
-			addToARPTable(sMAC, sIP);
-			
 			/*
 			System.out.println(sourceMAC.toString());
 			System.out.println(HexString.toHexString(sourceMAC));
@@ -353,9 +350,10 @@ public final class OFMArpControl extends OFModule {
 			
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
+				addToARPTable(sMAC, sIP);	//*** Request든, Reply든 IP와 MAC을 저장한다
+				System.out.println("\n*******" + arptable);
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
-
 					// ARP table lookup
 					String findedDestinationMAC = lookupARPTable(dIP);
 					// ARP table hit
@@ -410,15 +408,11 @@ public final class OFMArpControl extends OFModule {
 					// ARP table miss
 					else{
 						// request msg를 브로드캐스트
+						this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out);
 					}
-
-					
-								
-
 				}
 				// ARP reply msg
 				else if (opCode == ARP.OP_REPLY) {
-					// reply 수신 시, ARP table 업데이트
 					// reply msg 전달
 				}
 			}
@@ -467,8 +461,8 @@ public final class OFMArpControl extends OFModule {
 			// removed
 			// from port map whenever a flow expires, so you would still see
 			// a lot of floods.
-			this.writePacketOutForPacketIn(conn.getSwitch(), pi,
-					OFPort.OFPP_FLOOD.getValue(), out);
+//			this.writePacketOutForPacketIn(conn.getSwitch(), pi,
+//					OFPort.OFPP_FLOOD.getValue(), out);
 		} else if (outPort == match.getInputPort()) {
 			// ignore this packet.
 			// log.trace("ignoring packet that arrived on same port as learned destination:"
