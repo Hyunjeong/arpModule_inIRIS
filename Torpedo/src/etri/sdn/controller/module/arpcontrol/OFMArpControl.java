@@ -18,6 +18,7 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.util.HexString;
 import org.openflow.util.LRULinkedHashMap;
 import org.openflow.util.U8;
 
@@ -351,9 +352,30 @@ public final class OFMArpControl extends OFModule {
 			byte[] sourceMAC = Arrays.copyOfRange(packetData, 6, 12);
 			byte[] destinationMAC = Arrays.copyOfRange(packetData, 0, 6);
 			short opCode = ByteBuffer.wrap(packetData, 20, 2).getShort();
-			
-			
 
+			
+			String str = "Before : \n"; // l2 
+			 str += "\n1. Destination MAC : " +
+			 HexString.toHexString(match.getDataLayerDestination()); str +=
+			 "\n2. Destination MAC : " +
+			 HexString.toHexString(destinationMAC);
+			 
+			 str += "\n1.Source MAC : " +
+			 HexString.toHexString(match.getDataLayerSource()); str +=
+			 "\n2.Source MAC : " + HexString.toHexString(sourceMAC);
+			 
+			  //l3 
+			  if (match.getNetworkDestinationMaskLen() > 0) str +=
+			 "\n1.Destination IP : " +
+			 cidrToString(match.getNetworkDestination(),
+			 match.getNetworkDestinationMaskLen()); str +=
+			 "\n2.Destination IP : " + HexString.toHexString(destinationIP);
+			 
+			 if (match.getNetworkSourceMaskLen() > 0) str +=
+			 "\n1.Source IP : " + cidrToString(match.getNetworkSource(),
+			 match.getNetworkSourceMaskLen()); str += "\n2.Source IP : " +
+			 HexString.toHexString(sourceIP); Logger.stdout(str);
+			
 			/*
 			 * System.out.print("opcode : " + opCode);
 			 * System.out.println(" /// " + (opCode == ARP.OP_REQUEST));
@@ -371,6 +393,12 @@ public final class OFMArpControl extends OFModule {
 			addToARPTable(sourceMAC, sourceIP);
 			lookupARPTable(destinationIP);
 			
+			/*
+			System.out.println(sourceMAC.toString());
+			System.out.println(HexString.toHexString(sourceMAC));
+			System.out.println(HexString.toHexString(sourceMAC).toString());
+			System.out.println("====");
+			*/
 			
 	
 /*
@@ -388,14 +416,61 @@ public final class OFMArpControl extends OFModule {
 			if (!arpPacket.isGratuitous()) {
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
-					// ARP lookup
-						// yes
-							// arp reply 만들고 
-							// flow rule을 switch에 보내고
-							// reply packet 전송
-						// no
-							// request msg를 브로드캐스트
-								
+					// ARP table lookup
+	//				byte [] findedDestinationMAC = lookupARPTable(destinationIP);
+					// ARP table hit
+	//				if(!findedDestinationMAC.equals("")){
+						// arp reply 만들고 
+						System.arraycopy(sourceMAC, 0, packetData, 0, sourceMAC.length);
+						System.arraycopy(sourceMAC, 0, packetData, 32, sourceMAC.length);
+	//					System.arraycopy(findedDestinationMAC, 0, packetData, 6, findedDestinationMAC.length);
+	//					System.arraycopy(findedDestinationMAC, 0, packetData, 22, findedDestinationMAC.length);
+						System.arraycopy(sourceIP, 0, packetData, 38, sourceIP.length);
+						System.arraycopy(destinationIP, 0, packetData, 28, destinationIP.length);
+						
+						ByteBuffer buffer = ByteBuffer.allocate(2);
+						buffer.putShort(ARP.OP_REPLY);
+						buffer.flip();
+						byte[] opCodeForReply = buffer.array();
+						
+						System.arraycopy(opCodeForReply, 0, packetData, 20, opCodeForReply.length);
+						
+						/*
+						byte[] sourceIP1 = Arrays.copyOfRange(packetData, 28, 32);
+						byte[] destinationIP1 = Arrays.copyOfRange(packetData, 38, 42);
+						byte[] sourceMAC1 = Arrays.copyOfRange(packetData, 6, 12);
+						byte[] destinationMAC1 = Arrays.copyOfRange(packetData, 0, 6);
+						
+						 String str1 = "After : \n"; // l2 
+						 str1 += "\n1. Destination MAC : " +
+						 HexString.toHexString(match.getDataLayerDestination()); str1 +=
+						 "\n2. Destination MAC : " +
+						 HexString.toHexString(destinationMAC1);
+						 
+						 str1 += "\n1.Source MAC : " +
+						 HexString.toHexString(match.getDataLayerSource()); str1 +=
+						 "\n2.Source MAC : " + HexString.toHexString(sourceMAC1);
+						 
+						  //l3 
+						  if (match.getNetworkDestinationMaskLen() > 0) str1 +=
+						 "\n1.Destination IP : " +
+						 cidrToString(match.getNetworkDestination(),
+						 match.getNetworkDestinationMaskLen()); str1 +=
+						 "\n2.Destination IP : " + HexString.toHexString(destinationIP1);
+						 
+						 if (match.getNetworkSourceMaskLen() > 0) str1 +=
+						 "\n1.Source IP : " + cidrToString(match.getNetworkSource(),
+						 match.getNetworkSourceMaskLen()); str1 += "\n2.Source IP : " +
+						 HexString.toHexString(sourceIP1); Logger.stdout(str1);
+						 */
+						
+						// flow rule을 switch에 보내고
+						// reply packet 전송
+		//			}
+					// ARP table miss
+		//			else{
+						// request msg를 브로드캐스트
+		//			}
 				}
 				// ARP reply msg
 				else if (opCode == ARP.OP_REPLY) {
