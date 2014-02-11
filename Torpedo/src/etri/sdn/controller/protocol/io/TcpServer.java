@@ -65,7 +65,7 @@ public final class TcpServer extends Thread implements IOFProtocolServer {
 			Selector accept_selector = Selector.open();
 
 			ServerSocketChannel tcp_server = ServerSocketChannel.open();
-			tcp_server.socket().bind(new InetSocketAddress(6644));
+			tcp_server.socket().bind(new InetSocketAddress(6633));
 			tcp_server.configureBlocking(false);
 			tcp_server.register( accept_selector, SelectionKey.OP_ACCEPT );
 

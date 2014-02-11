@@ -84,28 +84,20 @@ public final class OFMArpControl extends OFModule {
 			OFMessage msg, List<OFMessage> outgoing) {
 		return processPacketInMessage(conn, context, msg, outgoing);
 	}
-
-	protected byte[] getMAC(byte[] IP) {
-		return new byte[] { 1, 2, 3, 4 };
-	}
-
-	protected boolean addEntry(byte[] IP, byte MAC) {
-		return true;
+	
+	private void addToARPTable(String MAC, String IP) {
+		arptable.put(MAC, IP);
 	}
 	
-	
-	private void addToARPTable(byte[] sourceMAC, byte[] sourceIP) {
-
+	private String lookupARPTable(String destinationIP) {
+		if(arptable.containsValue(destinationIP)){
+			String destMAC = (String) arptable.get(destinationIP);
+			System.out.println(destMAC);
+			return destMAC;
+		}else
+			return "";		
 	}
-	
-	
-	private void lookupARPTable(byte[] destinationIP) {
-		
-	}
 
-	
-
-	
 
 
 	/**
@@ -165,59 +157,7 @@ public final class OFMArpControl extends OFModule {
 		out.add(packetOutMessage);
 	}
 
-	/**
-	 * Adds a host to the MAC/VLAN->SwitchPort mapping
-	 * 
-	 * @param sw
-	 *            The switch to add the mapping to
-	 * @param mac
-	 *            The MAC address of the host to add
-	 * @param vlan
-	 *            The VLAN that the host is on
-	 * @param portVal
-	 *            The switchport that the host is on
-	 */
-	protected void addToPortMap(IOFSwitch sw, long mac, short vlan,
-			short portVal) {
-		Map<MacVlanPair, Short> swMap = macVlanToSwitchPortMap.get(sw);
 
-		if (vlan == (short) 0xffff) {
-			// OFMatch.loadFromPacket sets VLAN ID to 0xffff if the packet
-			// contains no VLAN tag;
-			// for our purposes that is equivalent to the default VLAN ID 0
-			vlan = 0;
-		}
-
-		if (swMap == null) {
-			// May be accessed by REST API so we need to make it thread safe
-			// swMap = new ConcurrentHashMap<MacVlanPair,Short>();
-			swMap = Collections
-					.synchronizedMap(new LRULinkedHashMap<MacVlanPair, Short>(
-							MAX_MACS_PER_SWITCH));
-			macVlanToSwitchPortMap.put(sw, swMap);
-		}
-		swMap.put(new MacVlanPair(mac, vlan, sw), portVal);
-	}
-
-	/**
-	 * Removes a host from the MAC/VLAN->SwitchPort mapping
-	 * 
-	 * @param sw
-	 *            The switch to remove the mapping from
-	 * @param mac
-	 *            The MAC address of the host to remove
-	 * @param vlan
-	 *            The VLAN that the host is on
-	 */
-	protected void removeFromPortMap(IOFSwitch sw, long mac, short vlan) {
-		if (vlan == (short) 0xffff) {
-			vlan = 0;
-		}
-
-		Map<MacVlanPair, Short> swMap = macVlanToSwitchPortMap.get(sw);
-		if (swMap != null)
-			swMap.remove(new MacVlanPair(mac, vlan, sw));
-	}
 
 	/**
 	 * Get the port that a MAC/VLAN pair is associated with
@@ -376,6 +316,18 @@ public final class OFMArpControl extends OFModule {
 			 match.getNetworkSourceMaskLen()); str += "\n2.Source IP : " +
 			 HexString.toHexString(sourceIP); Logger.stdout(str);
 			
+
+			
+			String sMAC = String.valueOf(HexString.toHexString(sourceMAC));
+			String dMAC = String.valueOf(HexString.toHexString(destinationMAC));
+			
+			String sIP = String.valueOf(sourceIP);
+			String dIP = String.valueOf(destinationIP);
+			
+			System.out.println(sMAC+"  "+dMAC);
+			
+
+
 			/*
 			 * System.out.print("opcode : " + opCode);
 			 * System.out.println(" /// " + (opCode == ARP.OP_REQUEST));
@@ -390,8 +342,7 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setTargetHardwareAddress(destinationMAC);
 			arpPacket.setTargetProtocolAddress(destinationIP);
 			
-			addToARPTable(sourceMAC, sourceIP);
-			lookupARPTable(destinationIP);
+			addToARPTable(sMAC, sIP);
 			
 			/*
 			System.out.println(sourceMAC.toString());
@@ -400,31 +351,20 @@ public final class OFMArpControl extends OFModule {
 			System.out.println("====");
 			*/
 			
-	
-/*
-			if(arptable.containsValue(destIP)){
-				System.out.println(dMAC);
-			}
-				else{
-					System.out.println("ARP reply 필요");
-				}
-					
-			return false;
-			*/
-			
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
+
 					// ARP table lookup
-	//				byte [] findedDestinationMAC = lookupARPTable(destinationIP);
+					String findedDestinationMAC = lookupARPTable(dIP);
 					// ARP table hit
-	//				if(!findedDestinationMAC.equals("")){
+					if(!findedDestinationMAC.equals("")){
 						// arp reply 만들고 
 						System.arraycopy(sourceMAC, 0, packetData, 0, sourceMAC.length);
 						System.arraycopy(sourceMAC, 0, packetData, 32, sourceMAC.length);
-	//					System.arraycopy(findedDestinationMAC, 0, packetData, 6, findedDestinationMAC.length);
-	//					System.arraycopy(findedDestinationMAC, 0, packetData, 22, findedDestinationMAC.length);
+						System.arraycopy(findedDestinationMAC, 0, packetData, 6, findedDestinationMAC.length());
+						System.arraycopy(findedDestinationMAC, 0, packetData, 22, findedDestinationMAC.length());
 						System.arraycopy(sourceIP, 0, packetData, 38, sourceIP.length);
 						System.arraycopy(destinationIP, 0, packetData, 28, destinationIP.length);
 						
@@ -466,11 +406,15 @@ public final class OFMArpControl extends OFModule {
 						
 						// flow rule을 switch에 보내고
 						// reply packet 전송
-		//			}
+					}
 					// ARP table miss
-		//			else{
+					else{
 						// request msg를 브로드캐스트
-		//			}
+					}
+
+					
+								
+
 				}
 				// ARP reply msg
 				else if (opCode == ARP.OP_REPLY) {
