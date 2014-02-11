@@ -18,7 +18,6 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
-import org.openflow.util.HexString;
 import org.openflow.util.LRULinkedHashMap;
 import org.openflow.util.U8;
 
@@ -58,7 +57,10 @@ public final class OFMArpControl extends OFModule {
 	private static final boolean LEARNING_SWITCH_REVERSE_FLOW = true;
 
 	private static final int MAX_MACS_PER_SWITCH = 1000;
+	
+	public static Map<String, Object> arptable = new HashMap<String, Object>();
 
+	
 	@Override
 	protected void initialize() {
 		registerFilter(OFType.PACKET_IN, new OFMFilter() {
@@ -91,7 +93,6 @@ public final class OFMArpControl extends OFModule {
 	}
 
 	
-	private Map<String, Object> arptable = new HashMap<String, Object>();
 
 
 	/**
@@ -338,6 +339,8 @@ public final class OFMArpControl extends OFModule {
 			byte[] sourceMAC = Arrays.copyOfRange(packetData, 6, 12);
 			byte[] destinationMAC = Arrays.copyOfRange(packetData, 0, 6);
 			short opCode = ByteBuffer.wrap(packetData, 20, 2).getShort();
+			
+			
 
 			/*
 			 * System.out.print("opcode : " + opCode);
@@ -352,6 +355,11 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setSenderProtocolAddress(sourceIP);
 			arpPacket.setTargetHardwareAddress(destinationMAC);
 			arpPacket.setTargetProtocolAddress(destinationIP);
+			
+			addToARPTable(sourceMAC, sourceIP);
+			
+			
+	
 /*
 			if(arptable.containsValue(destIP)){
 				System.out.println(dMAC);
