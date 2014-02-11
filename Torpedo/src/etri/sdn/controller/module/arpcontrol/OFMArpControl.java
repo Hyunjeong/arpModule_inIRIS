@@ -18,6 +18,7 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.util.HexString;
 import org.openflow.util.LRULinkedHashMap;
 import org.openflow.util.U8;
 
@@ -93,13 +94,18 @@ public final class OFMArpControl extends OFModule {
 	}
 	
 	
-	private void addToARPTable(byte[] sourceMAC, byte[] sourceIP) {
-
+	private void addToARPTable(String MAC, String IP) {
+		arptable.put(MAC, IP);
 	}
 	
 	
-	private void lookupARPTable(byte[] destinationIP) {
-		
+	private String lookupARPTable(String destinationIP) {
+		if(arptable.containsValue(destinationIP)){
+			String destMAC = (String) arptable.get(destinationIP);
+			System.out.println(destMAC);
+			return destMAC;
+		}else
+			return "";		
 	}
 
 	
@@ -353,6 +359,15 @@ public final class OFMArpControl extends OFModule {
 			short opCode = ByteBuffer.wrap(packetData, 20, 2).getShort();
 			
 			
+			
+			String sMAC = String.valueOf(HexString.toHexString(sourceMAC));
+			String dMAC = String.valueOf(HexString.toHexString(destinationMAC));
+			
+			String sIP = String.valueOf(sourceIP);
+			String dIP = String.valueOf(destinationIP);
+			
+			System.out.println(sMAC+"  "+dMAC);
+			
 
 			/*
 			 * System.out.print("opcode : " + opCode);
@@ -368,27 +383,14 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setTargetHardwareAddress(destinationMAC);
 			arpPacket.setTargetProtocolAddress(destinationIP);
 			
-			addToARPTable(sourceMAC, sourceIP);
-			lookupARPTable(destinationIP);
+			addToARPTable(sMAC, sIP);
 			
-			
-	
-/*
-			if(arptable.containsValue(destIP)){
-				System.out.println(dMAC);
-			}
-				else{
-					System.out.println("ARP reply 필요");
-				}
-					
-			return false;
-			*/
 			
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
-					// ARP lookup
+					lookupARPTable(dIP);
 						// yes
 							// arp reply 만들고 
 							// flow rule을 switch에 보내고
