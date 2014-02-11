@@ -90,7 +90,6 @@ public final class OFMArpControl extends OFModule {
 	private String lookupARPTable(String destinationIP) {
 		if(arptable.containsValue(destinationIP)){
 			String destMAC = (String) arptable.get(destinationIP);
-			System.out.println(destMAC);
 			return destMAC;
 		}else
 			return "";		
@@ -284,7 +283,6 @@ public final class OFMArpControl extends OFModule {
 		}
 
 		if (match.getDataLayerType() == 0x0806) {
-			Logger.stdout("ARP!!!!!!!!!\n");
 			byte[] sourceIP = Arrays.copyOfRange(packetData, 28, 32);
 			byte[] destinationIP = Arrays.copyOfRange(packetData, 38, 42);
 			byte[] sourceMAC = Arrays.copyOfRange(packetData, 6, 12);
@@ -315,16 +313,15 @@ public final class OFMArpControl extends OFModule {
 			 HexString.toHexString(sourceIP); Logger.stdout(str);
 			
 
+			// MAC & IP Address byte to String transform
 			
 			String sMAC = String.valueOf(HexString.toHexString(sourceMAC));
 			String dMAC = String.valueOf(HexString.toHexString(destinationMAC));
-			
-			String sIP = String.valueOf(sourceIP);
+						
+			String sIP = cidrToString(match.getNetworkSource(), match.getNetworkSourceMaskLen());
 			String dIP = String.valueOf(destinationIP);
 			
-			System.out.println(sMAC+"  "+dMAC);
-			
-			byte[] sourceMACB = HexString.fromHexString(sMAC);
+			addToARPTable(sMAC, sIP);
 			
 
 			/*
@@ -354,8 +351,14 @@ public final class OFMArpControl extends OFModule {
 				System.out.println("\n*******" + arptable);
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
+
 					// ARP table lookup
 					String findedDestinationMAC = lookupARPTable(dIP);
+					
+					System.out.println("ARPTable");
+					System.out.println(arptable);
+					System.out.println("=============================================");
+					
 					// ARP table hit
 					if(!findedDestinationMAC.equals("")){
 						// arp reply ¸¸µé°í 
