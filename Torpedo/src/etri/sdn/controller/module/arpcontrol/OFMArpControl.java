@@ -83,12 +83,12 @@ public final class OFMArpControl extends OFModule {
 		return processPacketInMessage(conn, context, msg, outgoing);
 	}
 	
-	private void addToARPTable(String MAC, String IP) {
-		arptable.put(MAC, IP);
+	private void addToARPTable(String IP, String MAC) {
+		arptable.put(IP, MAC);
 	}
 	
 	private String lookupARPTable(String destinationIP) {
-		if(arptable.containsValue(destinationIP)){
+		if(arptable.containsKey(destinationIP)){
 			String destMAC = (String) arptable.get(destinationIP);
 			return destMAC;
 		}else
@@ -313,15 +313,16 @@ public final class OFMArpControl extends OFModule {
 			 HexString.toHexString(sourceIP); Logger.stdout(str);
 			
 
+			 Logger.stdout("\nopcode : " + opCode);
 			// MAC & IP Address byte to String transform
 			
 			String sMAC = String.valueOf(HexString.toHexString(sourceMAC));
 			String dMAC = String.valueOf(HexString.toHexString(destinationMAC));
 						
 			String sIP = cidrToString(match.getNetworkSource(), match.getNetworkSourceMaskLen());
-			String dIP = String.valueOf(destinationIP);
+			String dIP = cidrToString(match.getNetworkDestination(), match.getNetworkDestinationMaskLen());
 			
-			addToARPTable(sMAC, sIP);
+			addToARPTable(sIP, sMAC);
 			
 
 			/*
@@ -347,7 +348,7 @@ public final class OFMArpControl extends OFModule {
 			
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
-				addToARPTable(sMAC, sIP);	//*** Request든, Reply든 IP와 MAC을 저장한다
+				addToARPTable(sIP, sMAC);	//*** Request든, Reply든 IP와 MAC을 저장한다
 				System.out.println("\n*******" + arptable);
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
@@ -360,12 +361,20 @@ public final class OFMArpControl extends OFModule {
 					System.out.println("=============================================");
 					
 					// ARP table hit
-					if(!findedDestinationMAC.equals("")){
+					try{
+					if(findedDestinationMAC != null && !findedDestinationMAC.equals("")){
+						Logger.stdout("hit!!!!!!!!!\n");
+						String[] sfindedDestinationMAC = findedDestinationMAC.split(":");
+						byte[] bfindedDestinationMAC = HexString.fromHexString(findedDestinationMAC);
+//						for(int i = 0; i < sfindedDestinationMAC.length; i++){
+//							String tmp = sfindedDestinationMAC[i];
+//							bfindedDestinationMAC[i] = tmp.getBytes(charset)
+//						}
 						// arp reply 만들고 
 						System.arraycopy(sourceMAC, 0, packetData, 0, sourceMAC.length);
 						System.arraycopy(sourceMAC, 0, packetData, 32, sourceMAC.length);
-						System.arraycopy(findedDestinationMAC, 0, packetData, 6, findedDestinationMAC.length());
-						System.arraycopy(findedDestinationMAC, 0, packetData, 22, findedDestinationMAC.length());
+						System.arraycopy(bfindedDestinationMAC, 0, packetData, 6, bfindedDestinationMAC.length);
+						System.arraycopy(bfindedDestinationMAC, 0, packetData, 22, bfindedDestinationMAC.length);
 						System.arraycopy(sourceIP, 0, packetData, 38, sourceIP.length);
 						System.arraycopy(destinationIP, 0, packetData, 28, destinationIP.length);
 						
@@ -407,11 +416,23 @@ public final class OFMArpControl extends OFModule {
 						
 						// flow rule을 switch에 보내고
 						// reply packet 전송
+						this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out); 
+						Logger.stdout("\nafter opcode : " + HexString.toHexString(opCodeForReply));
 					}
 					// ARP table miss
 					else{
 						// request msg를 브로드캐스트
-						this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out);
+						this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out); 
+					}
+					}
+					catch(NullPointerException e)
+					{
+						System.out.println("Null point exception!!! ==> findedDestinationMAC : " + findedDestinationMAC);
+					}
+					catch(ArrayStoreException e)
+					{
+						System.out.println("array store exception!!! ==> findedDestinationMAC : " + findedDestinationMAC);
+						System.out.println(e);
 					}
 				}
 				// ARP reply msg
@@ -466,12 +487,14 @@ public final class OFMArpControl extends OFModule {
 			// a lot of floods.
 //			this.writePacketOutForPacketIn(conn.getSwitch(), pi,
 //					OFPort.OFPP_FLOOD.getValue(), out);
+			Logger.stdout("**1**\n");
 		} else if (outPort == match.getInputPort()) {
 			// ignore this packet.
 			// log.trace("ignoring packet that arrived on same port as learned destination:"
 			// + " switch {} vlan {} dest MAC {} port {}",
 			// new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort
 			// });
+			Logger.stdout("**2**\n");
 		} else {
 			// Add flow table entry matching source MAC, dest MAC, VLAN and
 			// input port
@@ -489,6 +512,7 @@ public final class OFMArpControl extends OFModule {
 			// FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we
 			// have to match on
 			// NW_SRC and NW_DST as well
+			Logger.stdout("**3**\n");
 			match.setWildcards(((Integer) conn.getSwitch().getAttribute(
 					IOFSwitch.PROP_FASTWILDCARDS)).intValue()
 					& ~OFMatch.OFPFW_IN_PORT
@@ -521,8 +545,6 @@ public final class OFMArpControl extends OFModule {
 		}
 
 
-		match.loadFromPacket(pi.getPacketData(), pi.getInPort());		
-		
 		/**
 		 * Process a ARP packet. Extraction MAC and IP address to store hashmap
 		 */
