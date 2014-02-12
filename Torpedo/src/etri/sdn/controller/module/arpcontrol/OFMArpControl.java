@@ -1,5 +1,9 @@
 package etri.sdn.controller.module.arpcontrol;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -324,6 +328,34 @@ public final class OFMArpControl extends OFModule {
 		}
 
 		if (match.getDataLayerType() == 0x0806) {
+			
+			
+			InetAddress addr = null;
+			try {
+				addr = InetAddress.getLocalHost();
+			} catch (UnknownHostException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			NetworkInterface mac = null;
+			try {
+				mac = NetworkInterface.getByInetAddress(addr);
+			} catch (SocketException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			
+			byte[] controllerMAC = null;
+			try {
+				controllerMAC = mac.getHardwareAddress();
+			} catch (SocketException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			
+			
+			System.out.println(HexString.toHexString(controllerMAC));
+
 			byte[] sourceIP = Arrays.copyOfRange(packetData, 28, 32);
 			byte[] destinationIP = Arrays.copyOfRange(packetData, 38, 42);
 			byte[] sourceMAC = Arrays.copyOfRange(packetData, 6, 12);
@@ -448,6 +480,21 @@ public final class OFMArpControl extends OFModule {
 						 HexString.toHexString(sourceIP1); Logger.stdout(str1);
 						 */
 						
+						Logger.stdout("**3**\n");
+						match.setWildcards(((Integer) conn.getSwitch().getAttribute(
+								IOFSwitch.PROP_FASTWILDCARDS)).intValue()
+								& ~OFMatch.OFPFW_IN_PORT
+								& ~OFMatch.OFPFW_DL_VLAN
+								& ~OFMatch.OFPFW_DL_SRC
+								& ~OFMatch.OFPFW_DL_DST
+								& ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK);
+						
+						match.setDataLayerDestination(bfindedDestinationMAC);
+						match.setDataLayerSource(controllerMAC);
+						outPort = match.getInputPort();
+			
+						
+						
 						// flow rule을 switch에 보내고
 						// reply packet 전송
 
@@ -461,10 +508,10 @@ public final class OFMArpControl extends OFModule {
 						this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out); 
 					}
 					}
-					catch(NullPointerException e)
-					{
-						System.out.println("Null point exception!!! ==> findedDestinationMAC : " + findedDestinationMAC);
-					}
+//					catch(NullPointerException e)
+//					{
+//						System.out.println("Null point exception!!! ==> findedDestinationMAC : " + findedDestinationMAC);
+//					}
 					catch(ArrayStoreException e)
 					{
 						System.out.println("array store exception!!! ==> findedDestinationMAC : " + findedDestinationMAC);
@@ -514,72 +561,65 @@ public final class OFMArpControl extends OFModule {
 		 * }
 		 */
 		// Now output flow-mod and/or packet
-//		if (outPort == null) {
-//			// If we haven't learned the port for the dest MAC/VLAN, flood it
-//			// Don't flood broadcast packets if the broadcast is disabled.
-//			// XXX For LearningSwitch this doesn't do much. The sourceMac is
-//			// removed
-//			// from port map whenever a flow expires, so you would still see
-//			// a lot of floods.
-////			this.writePacketOutForPacketIn(conn.getSwitch(), pi,
-////					OFPort.OFPP_FLOOD.getValue(), out);
-//			Logger.stdout("**1**\n");
-//		} else if (outPort == match.getInputPort()) {
-//			// ignore this packet.
-//			// log.trace("ignoring packet that arrived on same port as learned destination:"
-//			// + " switch {} vlan {} dest MAC {} port {}",
-//			// new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort
-//			// });
-//			Logger.stdout("**2**\n");
-//		} else {
-//			// Add flow table entry matching source MAC, dest MAC, VLAN and
-//			// input port
-//			// that sends to the port we previously learned for the dest
-//			// MAC/VLAN. Also
-//			// add a flow table entry with source and destination MACs reversed,
-//			// and
-//			// input and output ports reversed. When either entry expires due to
-//			// idle
-//			// timeout, remove the other one. This ensures that if a device
-//			// moves to
-//			// a different port, a constant stream of packets headed to the
-//			// device at
-//			// its former location does not keep the stale entry alive forever.
-//			// FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we
-//			// have to match on
-//			// NW_SRC and NW_DST as well
-//			Logger.stdout("**3**\n");
-//			match.setWildcards(((Integer) conn.getSwitch().getAttribute(
-//					IOFSwitch.PROP_FASTWILDCARDS)).intValue()
-//					& ~OFMatch.OFPFW_IN_PORT
-//					& ~OFMatch.OFPFW_DL_VLAN
-//					& ~OFMatch.OFPFW_DL_SRC
-//					& ~OFMatch.OFPFW_DL_DST
-//					& ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK);
-//
-//			this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD,
-//					pi.getBufferId(), match, outPort, out);
-//			if (LEARNING_SWITCH_REVERSE_FLOW) {
-//				this.writeFlowMod(
-//						conn.getSwitch(),
-//						OFFlowMod.OFPFC_ADD,
-//						-1,
-//						match.clone()
-//						.setDataLayerSource(
-//								match.getDataLayerDestination())
-//								.setDataLayerDestination(
-//										match.getDataLayerSource())
-//										.setNetworkSource(match.getNetworkDestination())
-//										.setNetworkDestination(match.getNetworkSource())
-//										.setTransportSource(
-//												match.getTransportDestination())
-//												.setTransportDestination(
-//														match.getTransportSource())
-//														.setInputPort(outPort), match.getInputPort(),
-//														out);
-//			}
-//		}
-
+		if (outPort == null) {
+			// If we haven't learned the port for the dest MAC/VLAN, flood it
+			// Don't flood broadcast packets if the broadcast is disabled.
+			// XXX For LearningSwitch this doesn't do much. The sourceMac is
+			// removed
+			// from port map whenever a flow expires, so you would still see
+			// a lot of floods.
+			this.writePacketOutForPacketIn(conn.getSwitch(), pi,
+					OFPort.OFPP_FLOOD.getValue(), out);
+			Logger.stdout("**1**\n");
+		} else if (outPort == match.getInputPort()) {
+			// ignore this packet.
+			// log.trace("ignoring packet that arrived on same port as learned destination:"
+			// + " switch {} vlan {} dest MAC {} port {}",
+			// new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort
+			// });
+			Logger.stdout("**2**\n");
+		} else {
+			// Add flow table entry matching source MAC, dest MAC, VLAN and
+			// input port
+			// that sends to the port we previously learned for the dest
+			// MAC/VLAN. Also
+			// add a flow table entry with source and destination MACs reversed,
+			// and
+			// input and output ports reversed. When either entry expires due to
+			// idle
+			// timeout, remove the other one. This ensures that if a device
+			// moves to
+			// a different port, a constant stream of packets headed to the
+			// device at
+			// its former location does not keep the stale entry alive forever.
+			// FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we
+			// have to match on
+			// NW_SRC and NW_DST as well
+		this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD,
+				pi.getBufferId(), match, outPort, out);
+		if (LEARNING_SWITCH_REVERSE_FLOW) {
+			this.writeFlowMod(
+					conn.getSwitch(),
+					OFFlowMod.OFPFC_ADD,
+					-1,
+					match.clone()
+					.setDataLayerSource(
+							match.getDataLayerDestination())
+							.setDataLayerDestination(
+									match.getDataLayerSource())
+									.setNetworkSource(match.getNetworkDestination())
+									.setNetworkDestination(match.getNetworkSource())
+									.setTransportSource(
+											match.getTransportDestination())
+											.setTransportDestination(
+													match.getTransportSource())
+													.setInputPort(outPort), match.getInputPort(),
+													out);
+		}				
+		
+		
+		
+		}
 		return false;
 		
 	}
