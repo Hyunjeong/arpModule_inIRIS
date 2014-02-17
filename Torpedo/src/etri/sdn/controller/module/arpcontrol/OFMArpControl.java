@@ -35,6 +35,7 @@ import etri.sdn.controller.protocol.io.Connection;
 import etri.sdn.controller.protocol.io.IOFSwitch;
 import etri.sdn.controller.protocol.packet.ARP;
 import etri.sdn.controller.protocol.packet.Ethernet;
+import etri.sdn.controller.protocol.packet.IPacket;
 import etri.sdn.controller.util.Logger;
 
 /**
@@ -131,7 +132,7 @@ public final class OFMArpControl extends OFModule {
 		// length
 
 		// Set buffer_id, in_port, actions_len
-		packetOutMessage.setBufferId(packetInMessage.getBufferId());
+		packetOutMessage.setBufferId(OFPacketOut.BUFFER_ID_NONE);
 		packetOutMessage.setInPort(packetInMessage.getInPort());
 		packetOutMessage
 				.setActionsLength((short) OFActionOutput.MINIMUM_LENGTH);
@@ -411,7 +412,10 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setSenderHardwareAddress(sourceMAC);
 			arpPacket.setSenderProtocolAddress(sourceIP);
 			arpPacket.setTargetHardwareAddress(destinationMAC);
-			arpPacket.setTargetProtocolAddress(destinationIP);
+			arpPacket.setTargetProtocolAddress(destinationIP);			
+			
+			System.out.println(controllerMAC);
+			
 
 			/*
 			 * System.out.println(sourceMAC.toString());
