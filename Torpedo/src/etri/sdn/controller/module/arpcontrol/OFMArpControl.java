@@ -317,8 +317,6 @@ public final class OFMArpControl extends OFModule {
 		Long destMac = Ethernet.toLong(match.getDataLayerDestination());
 
 		Short vlan = match.getDataLayerVirtualLan();
-		Short outPort = getFromPortMap(conn.getSwitch(),
-				destMac, vlan);
 
 		// VLAN management packet
 		if ((destMac & 0xfffffffffff0L) == 0x0180c2000000L) {
@@ -486,54 +484,53 @@ public final class OFMArpControl extends OFModule {
 
 
 								// flow rule을 switch에 보내고
+								
+								Short outPort = getFromPortMap(conn.getSwitch(), sourceMac, vlan);
+								
+								System.out.println("ARPTABLE HIT!! ==> outPort = " +outPort);
 
-								if (outPort == null) {
-									// If we haven't learned the port for the
-									// dest MAC/VLAN, flood it
-									// Don't flood broadcast packets if the
-									// broadcast is disabled.
-									// XXX For LearningSwitch this doesn't do
-									// much. The sourceMac is removed
-									// from port map whenever a flow expires, so
-									// you would still see
-									// a lot of floods.
-									this.writePacketOutForPacketIn(
-											conn.getSwitch(), pi,
-											OFPort.OFPP_FLOOD.getValue(), out);
-								} else {
-
-									match.setWildcards(((Integer) conn
-											.getSwitch()
-											.getAttribute(
-													IOFSwitch.PROP_FASTWILDCARDS))
-											.intValue()
-											& ~OFMatch.OFPFW_IN_PORT
-											& ~OFMatch.OFPFW_DL_VLAN
-											& ~OFMatch.OFPFW_DL_SRC
-											& ~OFMatch.OFPFW_DL_DST
-											& ~OFMatch.OFPFW_NW_SRC_MASK
-											& ~OFMatch.OFPFW_NW_DST_MASK);
-									this.writeFlowMod(conn.getSwitch(),
-											OFFlowMod.OFPFC_ADD,
-											pi.getBufferId(), match, outPort,
-											out);
+//								if (outPort == null) {
+//									// If we haven't learned the port for the
+//									// dest MAC/VLAN, flood it
+//									// Don't flood broadcast packets if the
+//									// broadcast is disabled.
+//									// XXX For LearningSwitch this doesn't do
+//									// much. The sourceMac is removed
+//									// from port map whenever a flow expires, so
+//									// you would still see
+//									// a lot of floods.
+//									this.writePacketOutForPacketIn(
+//											conn.getSwitch(), pi,
+//											OFPort.OFPP_FLOOD.getValue(), out);
+//								} else {
+//
+//									match.setWildcards(((Integer) conn
+//											.getSwitch()
+//											.getAttribute(
+//													IOFSwitch.PROP_FASTWILDCARDS))
+//											.intValue()
+//											& ~OFMatch.OFPFW_IN_PORT
+//											& ~OFMatch.OFPFW_DL_VLAN
+//											& ~OFMatch.OFPFW_DL_SRC
+//											& ~OFMatch.OFPFW_DL_DST
+//											& ~OFMatch.OFPFW_NW_SRC_MASK
+//											& ~OFMatch.OFPFW_NW_DST_MASK);
+//									this.writeFlowMod(conn.getSwitch(),
+//											OFFlowMod.OFPFC_ADD,
+//											pi.getBufferId(), match, outPort,
+//											out);
 									
 									// reply packet 전송
 
-									this.writePacketOutForPacketIn(
-											conn.getSwitch(), pi.setPacketData(packetData),
-											OFPort.OFPP_FLOOD.getValue(), out);
-									Logger.stdout("\nafter opcode : "
-											+ HexString.toHexString(opCodeForReply));
-								}
+//								}
 							}
-							// ARP table miss
+							// if ARP table miss, ARP Request flooding
 							else {
 								// request msg를 브로드캐스트
 								this.writePacketOutForPacketIn(
 										conn.getSwitch(), pi,
 										OFPort.OFPP_FLOOD.getValue(), out);
-							}
+								}							
 						}
 						// catch(NullPointerException e)
 						// {
@@ -552,23 +549,31 @@ public final class OFMArpControl extends OFModule {
 					else if (opCode == ARP.OP_REPLY) {
 						// flow rule switch에 전송
 						
-						System.out.println(match.getInputPort() + "    "
-								+ outPort);
+						Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
 						
-						match.setWildcards(((Integer) conn.getSwitch()
-								.getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
-								.intValue()
+						System.out.println("ARP REPLY comming!! ==> outport =" + outPort);
+			
+						match.setWildcards(
+								((Integer)conn.getSwitch().getAttribute(IOFSwitch.PROP_FASTWILDCARDS)).intValue()
 								& ~OFMatch.OFPFW_IN_PORT
-								& ~OFMatch.OFPFW_DL_VLAN
-								& ~OFMatch.OFPFW_DL_SRC
-								& ~OFMatch.OFPFW_DL_DST
-								& ~OFMatch.OFPFW_NW_SRC_MASK
-								& ~OFMatch.OFPFW_NW_DST_MASK);
-						this.writeFlowMod(conn.getSwitch(),
-								OFFlowMod.OFPFC_ADD, pi.getBufferId(), match,
-								outPort, out);
-
-						// reply msg 전달
+								& ~OFMatch.OFPFW_DL_VLAN & ~OFMatch.OFPFW_DL_SRC & ~OFMatch.OFPFW_DL_DST
+								& ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK
+						);
+						this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, pi.getBufferId(), match, outPort, out);
+						if (LEARNING_SWITCH_REVERSE_FLOW) {
+							this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, -1, match.clone()
+									.setDataLayerSource(match.getDataLayerDestination())
+									.setDataLayerDestination(match.getDataLayerSource())
+									.setNetworkSource(match.getNetworkDestination())
+									.setNetworkDestination(match.getNetworkSource())
+									.setTransportSource(match.getTransportDestination())
+									.setTransportDestination(match.getTransportSource())
+									.setInputPort(outPort),
+									match.getInputPort(),
+									out
+							);
+						}
+									
 					}
 				}
 				// gratuitous ARP msg
@@ -576,6 +581,53 @@ public final class OFMArpControl extends OFModule {
 				}
 			}
 		}
+		
+//		// Now output flow-mod and/or packet
+//				Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
+//				if (outPort == null) {
+//					// If we haven't learned the port for the dest MAC/VLAN, flood it
+//					// Don't flood broadcast packets if the broadcast is disabled.
+//					// XXX For LearningSwitch this doesn't do much. The sourceMac is removed
+//					//     from port map whenever a flow expires, so you would still see
+//					//     a lot of floods.
+//					this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out);
+//				} else if (outPort == match.getInputPort()) {
+//					// ignore this packet.
+//					//            log.trace("ignoring packet that arrived on same port as learned destination:"
+//					//                    + " switch {} vlan {} dest MAC {} port {}",
+//					//                    new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort });
+//				} else {
+//					// Add flow table entry matching source MAC, dest MAC, VLAN and input port
+//					// that sends to the port we previously learned for the dest MAC/VLAN.  Also
+//					// add a flow table entry with source and destination MACs reversed, and
+//					// input and output ports reversed.  When either entry expires due to idle
+//					// timeout, remove the other one.  This ensures that if a device moves to
+//					// a different port, a constant stream of packets headed to the device at
+//					// its former location does not keep the stale entry alive forever.
+//					// FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we have to match on
+//					// NW_SRC and NW_DST as well
+//					match.setWildcards(
+//							((Integer)conn.getSwitch().getAttribute(IOFSwitch.PROP_FASTWILDCARDS)).intValue()
+//							& ~OFMatch.OFPFW_IN_PORT
+//							& ~OFMatch.OFPFW_DL_VLAN & ~OFMatch.OFPFW_DL_SRC & ~OFMatch.OFPFW_DL_DST
+//							& ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK
+//					);
+//					this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, pi.getBufferId(), match, outPort, out);
+//					if (LEARNING_SWITCH_REVERSE_FLOW) {
+//						this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, -1, match.clone()
+//								.setDataLayerSource(match.getDataLayerDestination())
+//								.setDataLayerDestination(match.getDataLayerSource())
+//								.setNetworkSource(match.getNetworkDestination())
+//								.setNetworkDestination(match.getNetworkSource())
+//								.setTransportSource(match.getTransportDestination())
+//								.setTransportDestination(match.getTransportSource())
+//								.setInputPort(outPort),
+//								match.getInputPort(),
+//								out
+//						);
+//					}
+//				}
+
 		return false;
 
 	}
