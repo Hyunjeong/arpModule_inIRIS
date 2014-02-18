@@ -443,11 +443,17 @@ public final class OFMArpControl extends OFModule {
 
 						// flow rule을 switch에 보내고
 
+						ByteBuffer bufferlong = ByteBuffer.allocate(bfindedDestinationMAC.length);
+						bufferlong.put(bfindedDestinationMAC);
+						bufferlong.flip();
+//						long tmp = bufferlong.getLong();
+//						System.out.println("하하하하 " + tmp);
+						
 						Short outPort = getFromPortMap(conn.getSwitch(),
 								sourceMac, vlan);
-						// Short inPort = getFromPortMap(conn.getSwitch(),
-						// destMac, vlan);
-
+						 Short inPort = getFromPortMap(conn.getSwitch(),
+						 HexString.toLong(findedDestinationMAC), vlan);
+						
 						if (outPort == null) {
 						
 						} else {
@@ -457,7 +463,7 @@ public final class OFMArpControl extends OFModule {
 							match.setNetworkSource(match.getNetworkDestination());
 							match.setNetworkDestination(tmpSIP);
 							match.setNetworkProtocol((byte) ARP.OP_REPLY);
-							// match.setInputPort(inPort);
+							 match.setInputPort(inPort);
 							match.setWildcards(((Integer) conn.getSwitch()
 									.getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
 									.intValue()
@@ -474,27 +480,27 @@ public final class OFMArpControl extends OFModule {
 									OFFlowMod.OFPFC_ADD, pi.getBufferId(),
 									match, outPort, out);
 							
-//							if (LEARNING_SWITCH_REVERSE_FLOW) {
-//								this.writeFlowMod(
-//										conn.getSwitch(),
-//										OFFlowMod.OFPFC_ADD,
-//										-1,
-//										match.clone()
-//												.setDataLayerSource(
-//														match.getDataLayerDestination())
-//												.setDataLayerDestination(
-//														match.getDataLayerSource())
-//												.setNetworkSource(
-//														match.getNetworkDestination())
-//												.setNetworkDestination(
-//														match.getNetworkSource())
-//												.setTransportSource(
-//														match.getTransportDestination())
-//												.setTransportDestination(
-//														match.getTransportSource())
-//												.setInputPort(outPort), match
-//												.getInputPort(), out);
-//							}
+							if (LEARNING_SWITCH_REVERSE_FLOW) {
+								this.writeFlowMod(
+										conn.getSwitch(),
+										OFFlowMod.OFPFC_ADD,
+										-1,
+										match.clone()
+												.setDataLayerSource(
+														match.getDataLayerDestination())
+												.setDataLayerDestination(
+														match.getDataLayerSource())
+												.setNetworkSource(
+														match.getNetworkDestination())
+												.setNetworkDestination(
+														match.getNetworkSource())
+												.setTransportSource(
+														match.getTransportDestination())
+												.setTransportDestination(
+														match.getTransportSource())
+												.setInputPort(outPort), match
+												.getInputPort(), out);
+							}
 							
 							
 							this.writePacketOutForPacketIn(conn.getSwitch(),
