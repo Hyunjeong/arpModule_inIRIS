@@ -122,7 +122,7 @@ public final class OFMArpControl extends OFModule {
 		 * length field in the header. (Only meaningful if
 		 * buffer_id == -1.)
 		 */
-		
+
 		OFPacketOut packetOutMessage = (OFPacketOut) sw.getConnection()
 				.getFactory().getMessage(OFType.PACKET_OUT);
 		short packetOutLength = (short) OFPacketOut.MINIMUM_LENGTH; // starting
@@ -154,8 +154,8 @@ public final class OFMArpControl extends OFModule {
 		// TODO: counter store support
 		// counterStore.updatePktOutFMCounterStore(sw, packetOutMessage);
 		out.add(packetOutMessage);
-//		Logger.stdout("Packet out data : "
-//				+ HexString.toHexString(packetOutMessage.getPacketData()));
+		//		Logger.stdout("Packet out data : "
+		//				+ HexString.toHexString(packetOutMessage.getPacketData()));
 	}
 
 	/**
@@ -305,7 +305,7 @@ public final class OFMArpControl extends OFModule {
 
 		OFPacketIn pi = (OFPacketIn) msg;
 		byte[] packetData = pi.getPacketData();
-		
+
 		OFMatch match = new OFMatch();
 
 		match.loadFromPacket(pi.getPacketData(), pi.getInPort());
@@ -320,16 +320,16 @@ public final class OFMArpControl extends OFModule {
 			return true;
 		}
 
-		if ((sourceMac & 0x010000000000L) == 0) {
-			// If source MAC is a unicast address, learn the port for this
-			// MAC/VLAN
-			this.addToPortMap(conn.getSwitch(), sourceMac, vlan, pi.getInPort());
-		}
+		//		if ((sourceMac & 0x010000000000L) == 0) {
+		// If source MAC is a unicast address, learn the port for this
+		// MAC/VLAN
+		this.addToPortMap(conn.getSwitch(), sourceMac, vlan, pi.getInPort());
+		//		}
 
 		if (match.getDataLayerType() == 0x0806) {
 
-//			Logger.stdout("Packet in data : "
-//					+ HexString.toHexString(packetData));
+			//			Logger.stdout("Packet in data : "
+			//					+ HexString.toHexString(packetData));
 			InetAddress addr = null;
 			try {
 				addr = InetAddress.getLocalHost();
@@ -384,7 +384,7 @@ public final class OFMArpControl extends OFModule {
 			//						+ cidrToString(match.getNetworkSource(),
 			//								match.getNetworkSourceMaskLen());
 			str += "\n2.Source IP : " + HexString.toHexString(sourceIP);
-//			Logger.stdout(str);
+			//			Logger.stdout(str);
 
 			//			Logger.stdout("\nopcode : " + opCode);
 			// MAC & IP Address byte to String transform
@@ -424,8 +424,8 @@ public final class OFMArpControl extends OFModule {
 				// normal ARP msg
 				if (!arpPacket.isGratuitous()) {
 					addToARPTable(sIP, sMAC); // *** Request든, Reply든 IP와 MAC을
-												// 저장한다
-//					System.out.println("\n*******" + arptable);
+					// 저장한다
+					//					System.out.println("\n*******" + arptable);
 
 					// ARP request msg
 					if (opCode == ARP.OP_REQUEST) {
@@ -437,9 +437,9 @@ public final class OFMArpControl extends OFModule {
 						try {
 							if (findedDestinationMAC != null
 									&& !findedDestinationMAC.equals("")) {
-//								Logger.stdout(sIP + " hit!!!!!!!!!" + dIP);
-//								Logger.stdout("ARP Reply network protocol! " + (byte)ARP.OP_REPLY);
-//								Logger.stdout("network protocol!! : REQUEST!!" + match.getNetworkProtocol());
+								//								Logger.stdout(sIP + " hit!!!!!!!!!" + dIP);
+								//								Logger.stdout("ARP Reply network protocol! " + (byte)ARP.OP_REPLY);
+								//								Logger.stdout("network protocol!! : REQUEST!!" + match.getNetworkProtocol());
 								byte[] bfindedDestinationMAC = HexString
 										.fromHexString(findedDestinationMAC);
 								// for(int i = 0; i <
@@ -473,10 +473,11 @@ public final class OFMArpControl extends OFModule {
 								System.arraycopy(opCodeForReply, 0, packetData,
 										20, opCodeForReply.length);
 
+
 								// flow rule을 switch에 보내고
 
 								Short outPort = getFromPortMap(conn.getSwitch(), sourceMac, vlan);
-
+								//								Short inPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
 
 								if (outPort == null) {
 									// If we haven't learned the port for the
@@ -488,10 +489,10 @@ public final class OFMArpControl extends OFModule {
 									// from port map whenever a flow expires, so
 									// you would still see
 									// a lot of floods.
-//									System.out.println("Flooding 됐어ㅠㅠㅠ");
-//									this.writePacketOutForPacketIn(
-//											conn.getSwitch(), pi.setPacketData(packetData),
-//											OFPort.OFPP_FLOOD.getValue(), out);
+																		System.out.println("Flooding 됐어ㅠㅠㅠ");
+																		this.writePacketOutForPacketIn(
+																				conn.getSwitch(), pi.setPacketData(packetData),
+																				OFPort.OFPP_FLOOD.getValue(), out);
 								} else {
 									match.setDataLayerDestination(match.getDataLayerSource());
 									match.setDataLayerSource(bfindedDestinationMAC);
@@ -499,11 +500,14 @@ public final class OFMArpControl extends OFModule {
 									match.setNetworkSource(match.getNetworkDestination());
 									match.setNetworkDestination(tmpSIP);
 									match.setNetworkProtocol((byte)ARP.OP_REPLY);
+									//									match.setInputPort(inPort);
 									match.setWildcards(((Integer) conn
 											.getSwitch()
 											.getAttribute(
 													IOFSwitch.PROP_FASTWILDCARDS))
 													.intValue()
+//													& ~OFMatch.OFPFW_IN_PORT
+													& ~OFMatch.OFPFW_DL_VLAN
 													& ~OFMatch.OFPFW_DL_SRC
 													& ~OFMatch.OFPFW_DL_DST
 													& ~OFMatch.OFPFW_NW_SRC_MASK
@@ -512,19 +516,22 @@ public final class OFMArpControl extends OFModule {
 											OFFlowMod.OFPFC_ADD,
 											pi.getBufferId(), match, outPort,
 											out);
-									System.out.println("<<Reply>>Requesting Source : " + dIP + " Replying Source : " + sIP);
-								}	
-//								for(IOFSwitch sw : macVlanToSwitchPortMap.keySet())
-//								{
-//									System.out.println("%%% "+ sw.getId());
-//									System.out.println(macVlanToSwitchPortMap.get(sw));
-//								}
-//								Logger.stdout("outPort : " + outPort);
-								// reply packet 전송
-								this.writePacketOutForPacketIn(
-										conn.getSwitch(), pi.setPacketData(packetData),
-										OFPort.OFPP_IN_PORT.getValue(), out);
+									this.writePacketOutForPacketIn(
+											conn.getSwitch(), pi.setPacketData(packetData),
+											OFPort.OFPP_IN_PORT.getValue(), out);
 
+									System.out.println("<<Making Reply Msg>> Requesting Source : " + dIP + " Replying Source : " + sIP);
+
+
+								}	
+								
+								//								for(IOFSwitch sw : macVlanToSwitchPortMap.keySet())
+								//								{
+								//									System.out.println("%%% "+ sw.getId());
+								//									System.out.println(macVlanToSwitchPortMap.get(sw));
+								//								}
+								//								Logger.stdout("outPort : " + outPort);
+								// reply packet 전송
 							}
 
 							// if ARP table miss, ARP Request flooding
@@ -554,7 +561,7 @@ public final class OFMArpControl extends OFModule {
 
 						Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
 
-//						System.out.println("ARP REPLY comming!! ==> Source/Destination/conn.switch/dest outport =" + sIP + " / " + dIP + " / " + conn.getSwitch().getId()+" / " + outPort);
+						//						System.out.println("ARP REPLY comming!! ==> Source/Destination/conn.switch/dest outport =" + sIP + " / " + dIP + " / " + conn.getSwitch().getId()+" / " + outPort);
 						if (outPort == null) {
 							// If we haven't learned the port for the
 							// dest MAC/VLAN, flood it
