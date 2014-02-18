@@ -55,7 +55,7 @@ public final class OFMArpControl extends OFModule {
 	private static final int APP_ID_SHIFT = (64 - APP_ID_BITS);
 	private static final long LEARNING_SWITCH_COOKIE = (long) (LEARNING_SWITCH_APP_ID & ((1 << APP_ID_BITS) - 1)) << APP_ID_SHIFT;
 
-	private static final short IDLE_TIMEOUT_DEFAULT = 100;
+	private static final short IDLE_TIMEOUT_DEFAULT = 5;
 	private static final short HARD_TIMEOUT_DEFAULT = 0;
 	private static final short PRIORITY_DEFAULT = 100;
 	// normally, setup reverse flow as well.
@@ -64,8 +64,6 @@ public final class OFMArpControl extends OFModule {
 	private static final int MAX_MACS_PER_SWITCH = 1000;
 
 	public static Map<String, Object> arptable = new HashMap<String, Object>();
-
-
 	@Override
 	protected void initialize() {
 		registerFilter(OFType.PACKET_IN, new OFMFilter() {
@@ -411,15 +409,9 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setSenderHardwareAddress(sourceMAC);
 			arpPacket.setSenderProtocolAddress(sourceIP);
 			arpPacket.setTargetHardwareAddress(destinationMAC);
+
 			arpPacket.setTargetProtocolAddress(destinationIP);			
 
-
-			/*
-			 * System.out.println(sourceMAC.toString());
-			 * System.out.println(HexString.toHexString(sourceMAC));
-			 * System.out.println(HexString.toHexString(sourceMAC).toString());
-			 * System.out.println("====");
-			 */
 
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
@@ -431,8 +423,9 @@ public final class OFMArpControl extends OFModule {
 
 				// normal ARP msg
 				if (!arpPacket.isGratuitous()) {
-					addToARPTable(sIP, sMAC); // *** Request든, Reply든 IP와 MAC을 저장한다
-					System.out.println("\n*******" + arptable);
+					addToARPTable(sIP, sMAC); // *** Request든, Reply든 IP와 MAC을
+												// 저장한다
+//					System.out.println("\n*******" + arptable);
 
 					// ARP request msg
 					if (opCode == ARP.OP_REQUEST) {
@@ -484,7 +477,6 @@ public final class OFMArpControl extends OFModule {
 
 								Short outPort = getFromPortMap(conn.getSwitch(), sourceMac, vlan);
 
-//								System.out.println("ARPTABLE HIT!! ==> Source/Destination/conn.switch/dest outport =" + sIP + " / " + dIP + " / " + conn.getSwitch().getId()+ " / " + outPort);
 
 								if (outPort == null) {
 									// If we haven't learned the port for the
@@ -520,7 +512,7 @@ public final class OFMArpControl extends OFModule {
 											OFFlowMod.OFPFC_ADD,
 											pi.getBufferId(), match, outPort,
 											out);
-									System.out.println("<<Reply>>Requesting Source : " + dIP + "Replying Source : " + sIP);
+									System.out.println("<<Reply>>Requesting Source : " + dIP + " Replying Source : " + sIP);
 								}	
 //								for(IOFSwitch sw : macVlanToSwitchPortMap.keySet())
 //								{
@@ -532,15 +524,16 @@ public final class OFMArpControl extends OFModule {
 								this.writePacketOutForPacketIn(
 										conn.getSwitch(), pi.setPacketData(packetData),
 										OFPort.OFPP_IN_PORT.getValue(), out);
+
 							}
 
 							// if ARP table miss, ARP Request flooding
 							else {
 								// request msg를 브로드캐스트
 								this.writePacketOutForPacketIn(
-										conn.getSwitch(), pi,
-										OFPort.OFPP_FLOOD.getValue(), out);
+										conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out);
 							}							
+
 						}
 						// catch(NullPointerException e)
 						// {
@@ -606,6 +599,7 @@ public final class OFMArpControl extends OFModule {
 									OFPort.OFPP_IN_PORT.getValue(), out);
 						}
 
+
 					}
 				}
 				// gratuitous ARP msg
@@ -613,6 +607,7 @@ public final class OFMArpControl extends OFModule {
 				}
 			}
 		}
+
 
 		//		// Now output flow-mod and/or packet
 		//				Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
@@ -659,6 +654,7 @@ public final class OFMArpControl extends OFModule {
 		//						);
 		//					}
 		//				}
+
 
 		return false;
 
