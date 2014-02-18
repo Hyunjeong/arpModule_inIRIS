@@ -451,12 +451,10 @@ public final class OFMArpControl extends OFModule {
 						if (outPort == null) {
 						
 						} else {
-							match.setDataLayerDestination(match
-									.getDataLayerSource());
+							match.setDataLayerDestination(match.getDataLayerSource());
 							match.setDataLayerSource(bfindedDestinationMAC);
 							int tmpSIP = match.getNetworkSource();
-							match.setNetworkSource(match
-									.getNetworkDestination());
+							match.setNetworkSource(match.getNetworkDestination());
 							match.setNetworkDestination(tmpSIP);
 							match.setNetworkProtocol((byte) ARP.OP_REPLY);
 							// match.setInputPort(inPort);
@@ -465,7 +463,7 @@ public final class OFMArpControl extends OFModule {
 									.intValue()
 									// & ~OFMatch.OFPFW_IN_PORT
 									
-								
+									& ~OFMatch.OFPFW_NW_PROTO
 									& ~OFMatch.OFPFW_DL_VLAN
 									& ~OFMatch.OFPFW_DL_SRC
 									& ~OFMatch.OFPFW_DL_DST
@@ -476,27 +474,27 @@ public final class OFMArpControl extends OFModule {
 									OFFlowMod.OFPFC_ADD, pi.getBufferId(),
 									match, outPort, out);
 							
-							if (LEARNING_SWITCH_REVERSE_FLOW) {
-								this.writeFlowMod(
-										conn.getSwitch(),
-										OFFlowMod.OFPFC_ADD,
-										-1,
-										match.clone()
-												.setDataLayerSource(
-														match.getDataLayerDestination())
-												.setDataLayerDestination(
-														match.getDataLayerSource())
-												.setNetworkSource(
-														match.getNetworkDestination())
-												.setNetworkDestination(
-														match.getNetworkSource())
-												.setTransportSource(
-														match.getTransportDestination())
-												.setTransportDestination(
-														match.getTransportSource())
-												.setInputPort(outPort), match
-												.getInputPort(), out);
-							}
+//							if (LEARNING_SWITCH_REVERSE_FLOW) {
+//								this.writeFlowMod(
+//										conn.getSwitch(),
+//										OFFlowMod.OFPFC_ADD,
+//										-1,
+//										match.clone()
+//												.setDataLayerSource(
+//														match.getDataLayerDestination())
+//												.setDataLayerDestination(
+//														match.getDataLayerSource())
+//												.setNetworkSource(
+//														match.getNetworkDestination())
+//												.setNetworkDestination(
+//														match.getNetworkSource())
+//												.setTransportSource(
+//														match.getTransportDestination())
+//												.setTransportDestination(
+//														match.getTransportSource())
+//												.setInputPort(outPort), match
+//												.getInputPort(), out);
+//							}
 							
 							
 							this.writePacketOutForPacketIn(conn.getSwitch(),
@@ -567,8 +565,8 @@ public final class OFMArpControl extends OFModule {
 											.setInputPort(outPort), match
 											.getInputPort(), out);
 						}
-						this.writePacketOutForPacketIn(conn.getSwitch(), pi,
-								OFPort.OFPP_IN_PORT.getValue(), out);
+//						this.writePacketOutForPacketIn(conn.getSwitch(), pi,
+//								OFPort.OFPP_IN_PORT.getValue(), out);
 					}
 
 				}
