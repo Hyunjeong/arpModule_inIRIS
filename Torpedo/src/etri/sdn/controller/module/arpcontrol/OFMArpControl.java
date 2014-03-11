@@ -48,6 +48,7 @@ public final class OFMArpControl extends OFModule {
 	 * Table to save learning result.
 	 */
 	private Map<IOFSwitch, Map<MacVlanPair, Short>> macVlanToSwitchPortMap = new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair, Short>>();
+	public static Map<String, Object> arptable = new HashMap<String, Object>();
 
 	// flow-mod - for use in the cookie
 	private static final int LEARNING_SWITCH_APP_ID = 1;
@@ -63,7 +64,6 @@ public final class OFMArpControl extends OFModule {
 
 	private static final int MAX_MACS_PER_SWITCH = 1000;
 
-	public static Map<String, Object> arptable = new HashMap<String, Object>();
 
 	@Override
 	protected void initialize() {
@@ -119,10 +119,10 @@ public final class OFMArpControl extends OFModule {
 		// uint16_t actions_len; /* Size of action array in bytes. */
 		// struct ofp_action_header actions[0]; /* Actions. */
 		/* uint8_t data[0]; *//*
-							 * Packet data. The length is inferred from the
-							 * length field in the header. (Only meaningful if
-							 * buffer_id == -1.)
-							 */
+		 * Packet data. The length is inferred from the
+		 * length field in the header. (Only meaningful if
+		 * buffer_id == -1.)
+		 */
 
 		OFPacketOut packetOutMessage = (OFPacketOut) sw.getConnection()
 				.getFactory().getMessage(OFType.PACKET_OUT);
@@ -133,7 +133,7 @@ public final class OFMArpControl extends OFModule {
 		packetOutMessage.setBufferId(OFPacketOut.BUFFER_ID_NONE);
 		packetOutMessage.setInPort(packetInMessage.getInPort());
 		packetOutMessage
-				.setActionsLength((short) OFActionOutput.MINIMUM_LENGTH);
+		.setActionsLength((short) OFActionOutput.MINIMUM_LENGTH);
 		packetOutLength += OFActionOutput.MINIMUM_LENGTH;
 
 		// set actions
@@ -313,7 +313,6 @@ public final class OFMArpControl extends OFModule {
 
 		Long sourceMac = Ethernet.toLong(match.getDataLayerSource());
 		Long destMac = Ethernet.toLong(match.getDataLayerDestination());
-
 		Short vlan = match.getDataLayerVirtualLan();
 
 		// VLAN management packet
@@ -321,11 +320,11 @@ public final class OFMArpControl extends OFModule {
 			return true;
 		}
 
-		// if ((sourceMac & 0x010000000000L) == 0) {
-		// If source MAC is a unicast address, learn the port for this
-		// MAC/VLAN
-		this.addToPortMap(conn.getSwitch(), sourceMac, vlan, pi.getInPort());
-		// }
+		if ((sourceMac & 0x010000000000L) == 0) {
+			// If source MAC is a unicast address, learn the port for this
+			// MAC/VLAN
+			this.addToPortMap(conn.getSwitch(), sourceMac, vlan, pi.getInPort());
+		}
 
 		if (match.getDataLayerType() == 0x0806) {
 
@@ -337,33 +336,6 @@ public final class OFMArpControl extends OFModule {
 			byte[] destinationMAC = Arrays.copyOfRange(packetData, 0, 6);
 			short opCode = ByteBuffer.wrap(packetData, 20, 2).getShort();
 
-			String str = "Before : \n"; // l2
-			// str += "\n1. Destination MAC : "
-			// + HexString.toHexString(match.getDataLayerDestination());
-			// str += "\n2. Destination MAC : "
-			// + HexString.toHexString(destinationMAC);
-			//
-			// str += "\n1.Source MAC : "
-			// + HexString.toHexString(match.getDataLayerSource());
-			// str += "\n2.Source MAC : " + HexString.toHexString(sourceMAC);
-
-			// l3
-			// if (match.getNetworkDestinationMaskLen() > 0)
-			// str += "\n1.Destination IP : "
-			// + cidrToString(match.getNetworkDestination(),
-			// match.getNetworkDestinationMaskLen());
-			str += "\n2.Destination IP : "
-					+ HexString.toHexString(destinationIP);
-
-			// if (match.getNetworkSourceMaskLen() > 0)
-			// str += "\n1.Source IP : "
-			// + cidrToString(match.getNetworkSource(),
-			// match.getNetworkSourceMaskLen());
-			str += "\n2.Source IP : " + HexString.toHexString(sourceIP);
-			// Logger.stdout(str);
-
-			// Logger.stdout("\nopcode : " + opCode);
-			// MAC & IP Address byte to String transform
 
 			String sMAC = String.valueOf(HexString.toHexString(sourceMAC));
 			String dMAC = String.valueOf(HexString.toHexString(destinationMAC));
@@ -373,11 +345,6 @@ public final class OFMArpControl extends OFModule {
 			String dIP = cidrToString(match.getNetworkDestination(),
 					match.getNetworkDestinationMaskLen());
 
-			/*
-			 * System.out.print("opcode : " + opCode);
-			 * System.out.println(" /// " + (opCode == ARP.OP_REQUEST));
-			 */
-
 			ARP arpPacket = new ARP();
 			arpPacket.setHardwareType(ARP.HW_TYPE_ETHERNET);
 			arpPacket.setProtocolType(ARP.PROTO_TYPE_IP);
@@ -385,16 +352,36 @@ public final class OFMArpControl extends OFModule {
 			arpPacket.setSenderHardwareAddress(sourceMAC);
 			arpPacket.setSenderProtocolAddress(sourceIP);
 			arpPacket.setTargetHardwareAddress(destinationMAC);
-
 			arpPacket.setTargetProtocolAddress(destinationIP);
 
+			InetAddress addr = null;
+			try {
+				addr = InetAddress.getLocalHost();
+			} catch (UnknownHostException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+
+			NetworkInterface ni = null;
+			byte[] contorllerMac = null;
+
+			try {
+				ni = NetworkInterface.getByInetAddress(addr);
+			} catch (SocketException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			try {
+				contorllerMac = ni.getHardwareAddress();
+			} catch (SocketException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			System.out.println("MAC of contorller : " + HexString.toHexString(contorllerMac));
 			// normal ARP msg
 			if (!arpPacket.isGratuitous()) {
 				addToARPTable(sIP, sMAC); // *** Request든, Reply든 IP와 MAC을 저장한다
-
-				// System.out.println("\n*******" + arptable);
-				// System.out
-				// .println("=============================================");
+				
 				// ARP request msg
 				if (opCode == ARP.OP_REQUEST) {
 
@@ -402,30 +389,19 @@ public final class OFMArpControl extends OFModule {
 					String findedDestinationMAC = lookupARPTable(dIP);
 
 					// ARP table hit
-
 					if (findedDestinationMAC != null
 							&& !findedDestinationMAC.equals("")) {
-						 Logger.stdout(sIP + " hit!!!!!!!!!" + dIP);
-						// Logger.stdout("ARP Reply network protocol! " +
-						// (byte)ARP.OP_REPLY);
-						// Logger.stdout("network protocol!! : REQUEST!!" +
-						// match.getNetworkProtocol());
+						
 						byte[] bfindedDestinationMAC = HexString
 								.fromHexString(findedDestinationMAC);
-						// for(int i = 0; i <
-						// sfindedDestinationMAC.length;
-						// i++){
-						// String tmp = sfindedDestinationMAC[i];
-						// bfindedDestinationMAC[i] =
-						// tmp.getBytes(charset)
-						// }
+						
 						// arp reply 만들고
 						System.arraycopy(sourceMAC, 0, packetData, 0,
 								sourceMAC.length);
 						System.arraycopy(sourceMAC, 0, packetData, 32,
 								sourceMAC.length);
-						System.arraycopy(bfindedDestinationMAC, 0, packetData,
-								6, bfindedDestinationMAC.length);
+						System.arraycopy(contorllerMac, 0, packetData,
+								6, contorllerMac.length);
 						System.arraycopy(bfindedDestinationMAC, 0, packetData,
 								22, bfindedDestinationMAC.length);
 						System.arraycopy(sourceIP, 0, packetData, 38,
@@ -442,20 +418,13 @@ public final class OFMArpControl extends OFModule {
 								opCodeForReply.length);
 
 						// flow rule을 switch에 보내고
-
-						ByteBuffer bufferlong = ByteBuffer.allocate(bfindedDestinationMAC.length);
-						bufferlong.put(bfindedDestinationMAC);
-						bufferlong.flip();
-//						long tmp = bufferlong.getLong();
-//						System.out.println("하하하하 " + tmp);
-						
 						Short outPort = getFromPortMap(conn.getSwitch(),
 								sourceMac, vlan);
-						 Short inPort = getFromPortMap(conn.getSwitch(),
-						 HexString.toLong(findedDestinationMAC), vlan);
-						
+//						Short inPort = getFromPortMap(conn.getSwitch(),
+//								HexString.toLong(findedDestinationMAC), vlan);
+
 						if (outPort == null) {
-						
+
 						} else {
 							match.setDataLayerDestination(match.getDataLayerSource());
 							match.setDataLayerSource(bfindedDestinationMAC);
@@ -463,58 +432,64 @@ public final class OFMArpControl extends OFModule {
 							match.setNetworkSource(match.getNetworkDestination());
 							match.setNetworkDestination(tmpSIP);
 							match.setNetworkProtocol((byte) ARP.OP_REPLY);
-							 match.setInputPort(inPort);
+							try{
+//								match.setInputPort(inPort);
+							}catch(Exception e)
+							{
+								System.out.print(findedDestinationMAC + "가 macportmap에 없어!! ip ==> " + dIP);
+								System.out.println(" Requesting IP ==> " + sIP);
+							}
 							match.setWildcards(((Integer) conn.getSwitch()
 									.getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
 									.intValue()
 									// & ~OFMatch.OFPFW_IN_PORT
-									
+
 									& ~OFMatch.OFPFW_NW_PROTO
 									& ~OFMatch.OFPFW_DL_VLAN
 									& ~OFMatch.OFPFW_DL_SRC
 									& ~OFMatch.OFPFW_DL_DST
 									& ~OFMatch.OFPFW_NW_SRC_MASK
 									& ~OFMatch.OFPFW_NW_DST_MASK);
-							
+
 							this.writeFlowMod(conn.getSwitch(),
 									OFFlowMod.OFPFC_ADD, pi.getBufferId(),
 									match, outPort, out);
-							
-							if (LEARNING_SWITCH_REVERSE_FLOW) {
-								this.writeFlowMod(
-										conn.getSwitch(),
-										OFFlowMod.OFPFC_ADD,
-										-1,
-										match.clone()
-												.setDataLayerSource(
-														match.getDataLayerDestination())
-												.setDataLayerDestination(
-														match.getDataLayerSource())
-												.setNetworkSource(
-														match.getNetworkDestination())
-												.setNetworkDestination(
-														match.getNetworkSource())
-												.setTransportSource(
-														match.getTransportDestination())
-												.setTransportDestination(
-														match.getTransportSource())
-												.setInputPort(outPort), match
-												.getInputPort(), out);
-							}
-							
-							
+
+//							if (LEARNING_SWITCH_REVERSE_FLOW) {
+//								this.writeFlowMod(
+//										conn.getSwitch(),
+//										OFFlowMod.OFPFC_ADD,
+//										-1,
+//										match.clone()
+//										.setDataLayerSource(
+//												match.getDataLayerDestination())
+//												.setDataLayerDestination(
+//														match.getDataLayerSource())
+//														.setNetworkSource(
+//																match.getNetworkDestination())
+//																.setNetworkDestination(
+//																		match.getNetworkSource())
+//																		.setTransportSource(
+//																				match.getTransportDestination())
+//																				.setTransportDestination(
+//																						match.getTransportSource())
+//																						.setInputPort(outPort), match
+//																						.getInputPort(), out);
+//							}
+
 							this.writePacketOutForPacketIn(conn.getSwitch(),
 									pi.setPacketData(packetData),
 									OFPort.OFPP_IN_PORT.getValue(), out);
 
 							System.out
-									.println("<<Making Reply Msg>> Requesting Source : "
-											+ dIP + " Replying Source : " + sIP);
+							.println("<<Making Reply Msg>> Requesting Source : "
+									+ dIP + " Replying Source : " + sIP);
 						}
 					}
 
 					// if ARP table miss, ARP Request flooding
 					else {
+						System.out.println("★ " + "Miss!! Requesting Source : " + sIP + " Replying Source : " + dIP);
 						// request msg를 브로드캐스트
 						this.writePacketOutForPacketIn(conn.getSwitch(), pi,
 								OFPort.OFPP_FLOOD.getValue(), out);
@@ -524,55 +499,63 @@ public final class OFMArpControl extends OFModule {
 				// ARP reply msg
 				else if (opCode == ARP.OP_REPLY) {
 					// flow rule switch에 전송
-
-					Short outPort = getFromPortMap(conn.getSwitch(), destMac,
-							vlan);
-
+					Short outPort = null;
+					IOFSwitch destSW = null;
+					for(IOFSwitch sw : macVlanToSwitchPortMap.keySet())
+					{
+						outPort = getFromPortMap(sw, destMac, vlan);
+						if(outPort != null)
+						{
+							destSW = sw;
+							break;
+						}
+					}
+					
 					// System.out.println("ARP REPLY comming!! ==> Source/Destination/conn.switch/dest outport ="
 					// + sIP + " / " + dIP + " / " +
 					// conn.getSwitch().getId()+" / " + outPort);
 					if (outPort == null) {
-						
+						System.out.println("으악!!!!!!안돼안ㄷ왜안ㄷ왜1!!!!!");
 					} else {
-						match.setWildcards(((Integer) conn.getSwitch()
+						match.setWildcards(((Integer) destSW	//
 								.getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
 								.intValue()
-								& ~OFMatch.OFPFW_IN_PORT
+//								& ~OFMatch.OFPFW_IN_PORT
 								& ~OFMatch.OFPFW_DL_VLAN
 								& ~OFMatch.OFPFW_DL_SRC
 								& ~OFMatch.OFPFW_DL_DST
 								& ~OFMatch.OFPFW_NW_SRC_MASK
 								& ~OFMatch.OFPFW_NW_DST_MASK);
 						try {
-							this.writeFlowMod(conn.getSwitch(),
+							this.writeFlowMod(destSW,	//
 									OFFlowMod.OFPFC_ADD, pi.getBufferId(),
-									match, outPort, out);
+									match, outPort, out);	//
 						} catch (Exception e) {
 							System.out.println(e + " outPort : " + outPort);
 						}
-						if (LEARNING_SWITCH_REVERSE_FLOW) {
-							this.writeFlowMod(
-									conn.getSwitch(),
-									OFFlowMod.OFPFC_ADD,
-									-1,
-									match.clone()
-											.setDataLayerSource(
-													match.getDataLayerDestination())
-											.setDataLayerDestination(
-													match.getDataLayerSource())
-											.setNetworkSource(
-													match.getNetworkDestination())
-											.setNetworkDestination(
-													match.getNetworkSource())
-											.setTransportSource(
-													match.getTransportDestination())
-											.setTransportDestination(
-													match.getTransportSource())
-											.setInputPort(outPort), match
-											.getInputPort(), out);
-						}
-//						this.writePacketOutForPacketIn(conn.getSwitch(), pi,
-//								OFPort.OFPP_IN_PORT.getValue(), out);
+//						if (LEARNING_SWITCH_REVERSE_FLOW) {
+//							this.writeFlowMod(
+//									conn.getSwitch(),
+//									OFFlowMod.OFPFC_ADD,
+//									-1,
+//									match.clone()
+//									.setDataLayerSource(
+//											match.getDataLayerDestination())
+//											.setDataLayerDestination(
+//													match.getDataLayerSource())
+//													.setNetworkSource(
+//															match.getNetworkDestination())
+//															.setNetworkDestination(
+//																	match.getNetworkSource())
+//																	.setTransportSource(
+//																			match.getTransportDestination())
+//																			.setTransportDestination(
+//																					match.getTransportSource())
+//																					.setInputPort(outPort), match
+//																					.getInputPort(), out);
+//						}
+												this.writePacketOutForPacketIn(destSW, pi,
+														outPort, out);
 					}
 
 				}
@@ -582,7 +565,54 @@ public final class OFMArpControl extends OFModule {
 			}
 
 		}
-
+		// Not an ARP msg
+		else{
+			// Now output flow-mod and/or packet
+			Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
+			if (outPort == null) {
+				// If we haven't learned the port for the dest MAC/VLAN, flood it
+				// Don't flood broadcast packets if the broadcast is disabled.
+				// XXX For LearningSwitch this doesn't do much. The sourceMac is removed
+				//     from port map whenever a flow expires, so you would still see
+				//     a lot of floods.
+				this.writePacketOutForPacketIn(conn.getSwitch(), pi, OFPort.OFPP_FLOOD.getValue(), out);
+			} else if (outPort == match.getInputPort()) {
+				// ignore this packet.
+				//            log.trace("ignoring packet that arrived on same port as learned destination:"
+				//                    + " switch {} vlan {} dest MAC {} port {}",
+				//                    new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort });
+			} else {
+				// Add flow table entry matching source MAC, dest MAC, VLAN and input port
+				// that sends to the port we previously learned for the dest MAC/VLAN.  Also
+				// add a flow table entry with source and destination MACs reversed, and
+				// input and output ports reversed.  When either entry expires due to idle
+				// timeout, remove the other one.  This ensures that if a device moves to
+				// a different port, a constant stream of packets headed to the device at
+				// its former location does not keep the stale entry alive forever.
+				// FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we have to match on
+				// NW_SRC and NW_DST as well
+				match.setWildcards(
+						((Integer)conn.getSwitch().getAttribute(IOFSwitch.PROP_FASTWILDCARDS)).intValue()
+						& ~OFMatch.OFPFW_IN_PORT
+						& ~OFMatch.OFPFW_DL_VLAN & ~OFMatch.OFPFW_DL_SRC & ~OFMatch.OFPFW_DL_DST
+						& ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK
+				);
+				this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, pi.getBufferId(), match, outPort, out);
+				if (LEARNING_SWITCH_REVERSE_FLOW) {
+					this.writeFlowMod(conn.getSwitch(), OFFlowMod.OFPFC_ADD, -1, match.clone()
+							.setDataLayerSource(match.getDataLayerDestination())
+							.setDataLayerDestination(match.getDataLayerSource())
+							.setNetworkSource(match.getNetworkDestination())
+							.setNetworkDestination(match.getNetworkSource())
+							.setTransportSource(match.getTransportDestination())
+							.setTransportDestination(match.getTransportSource())
+							.setInputPort(outPort),
+							match.getInputPort(),
+							out
+					);
+				}
+			}
+		}
 		// // Now output flow-mod and/or packet
 		// Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
 		// if (outPort == null) {

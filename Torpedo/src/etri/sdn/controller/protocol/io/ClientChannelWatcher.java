@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
 
+import etri.sdn.controller.module.arpcontrol.OFMArpControl;
 import etri.sdn.controller.util.Logger;
 
 /**
@@ -220,6 +221,7 @@ public final class ClientChannelWatcher extends Thread {
 	private void handleDisconnectedEvent(Connection conn) {
 		try {
 			Logger.stderr("disconnected with " + conn.getClient().getRemoteAddress());
+			OFMArpControl.arptable.clear();
 		} catch (IOException e) {
 			Logger.stderr("disconnected with a switch (reason is unknown)");
 		}
