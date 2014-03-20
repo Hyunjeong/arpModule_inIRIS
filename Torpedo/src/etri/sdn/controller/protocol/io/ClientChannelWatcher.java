@@ -221,7 +221,8 @@ public final class ClientChannelWatcher extends Thread {
 	private void handleDisconnectedEvent(Connection conn) {
 		try {
 			Logger.stderr("disconnected with " + conn.getClient().getRemoteAddress());
-			OFMArpControl.arptable.clear();
+			OFMArpControl.arptable.clear();	//해당 호스트만 
+//			OFMArpControl.pw.close();
 		} catch (IOException e) {
 			Logger.stderr("disconnected with a switch (reason is unknown)");
 		}

@@ -53,7 +53,7 @@ public class ARPServerOFController extends OFController {
 	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
 	private OFMArpControl m_arp_control = new OFMArpControl();
 	private OFMStorageManager m_storage_manager = new OFMStorageManager();	
-
+	private OFMDeviceManager m_device_manager = new OFMDeviceManager();
 	
 	private OFModule[] packet_in_pipeline = { 
 			m_arp_control,
@@ -61,7 +61,7 @@ public class ARPServerOFController extends OFController {
 	//		m_learning_mac,
 	//		m_topology_manager,
 	//		m_entity_classifier, 
-	//		m_device_manager
+			m_device_manager
 	};
 
 	public ARPServerOFController(int num_of_queue, String role) {
@@ -79,7 +79,7 @@ public class ARPServerOFController extends OFController {
 		m_link_discovery.init(this);
 //		m_topology_manager.init(this);
 //		m_entity_classifier.init(this);
-//		m_device_manager.init(this);
+		m_device_manager.init(this);
 		m_state_manager.init(this);			// this is not a part of the pipeline.
 //		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//
 		m_user_interface.init(this);		// this is not a part of the pipeline.
