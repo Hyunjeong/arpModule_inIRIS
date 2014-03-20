@@ -49,7 +49,9 @@ public class ARPServerOFController extends OFController {
 //	private OFMLearningMac m_learning_mac = new OFMLearningMac();
 	private OFMStateManager m_state_manager = new OFMStateManager();
 	private OFMUserInterface m_user_interface = new OFMUserInterface();
-
+	private OFMTopologyManager m_topology_manager = new OFMTopologyManager();
+	private OFMDefaultEntityClassifier m_entity_classifier = new OFMDefaultEntityClassifier();
+	
 	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
 	private OFMArpControl m_arp_control = new OFMArpControl();
 	private OFMStorageManager m_storage_manager = new OFMStorageManager();	
@@ -59,8 +61,8 @@ public class ARPServerOFController extends OFController {
 			m_arp_control,
 			m_link_discovery, 
 	//		m_learning_mac,
-	//		m_topology_manager,
-	//		m_entity_classifier, 
+			m_topology_manager,
+			m_entity_classifier, 
 			m_device_manager
 	};
 
@@ -77,8 +79,8 @@ public class ARPServerOFController extends OFController {
 		m_arp_control.init(this);
 //		m_learning_mac.init(this);
 		m_link_discovery.init(this);
-//		m_topology_manager.init(this);
-//		m_entity_classifier.init(this);
+		m_topology_manager.init(this);
+		m_entity_classifier.init(this);
 		m_device_manager.init(this);
 		m_state_manager.init(this);			// this is not a part of the pipeline.
 //		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//

@@ -682,7 +682,7 @@ public final class OFMArpControl extends OFModule {
 		// }
 		// }
 
-		return false;
+		return true;
 
 	}
 
