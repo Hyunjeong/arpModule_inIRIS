@@ -51,6 +51,7 @@ public class ARPServerOFController extends OFController {
 	private OFMUserInterface m_user_interface = new OFMUserInterface();
 	private OFMTopologyManager m_topology_manager = new OFMTopologyManager();
 	private OFMDefaultEntityClassifier m_entity_classifier = new OFMDefaultEntityClassifier();
+	private OFMStaticFlowEntryPusher m_static_entry_pusher = new OFMStaticFlowEntryPusher();
 	
 	private OFMLinkDiscovery m_link_discovery = new OFMLinkDiscovery();
 	private OFMArpControl m_arp_control = new OFMArpControl();
@@ -83,7 +84,7 @@ public class ARPServerOFController extends OFController {
 		m_entity_classifier.init(this);
 		m_device_manager.init(this);
 		m_state_manager.init(this);			// this is not a part of the pipeline.
-//		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//
+		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//
 		m_user_interface.init(this);		// this is not a part of the pipeline.
 		m_storage_manager.init(this);		// this is not a part of the pipeline.
 	}
