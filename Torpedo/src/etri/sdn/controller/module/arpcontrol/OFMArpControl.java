@@ -397,11 +397,8 @@ public final class OFMArpControl extends OFModule {
 					if (findedDestinationMAC != null
 							&& !findedDestinationMAC.equals("")) {
 
-						//						System.out.print("findedDestinationMAC : " + findedDestinationMAC + " dIP : " + dIP + "\t");
-
 						byte[] bfindedDestinationMAC = HexString
 								.fromHexString(findedDestinationMAC);
-
 
 						// arp reply 만들고
 						System.arraycopy(sourceMAC, 0, packetData, 0,
@@ -428,8 +425,6 @@ public final class OFMArpControl extends OFModule {
 						// flow rule을 switch에 보내고
 						Short outPort = getFromPortMap(conn.getSwitch(),
 								sourceMac, vlan);
-						//						Short inPort = getFromPortMap(conn.getSwitch(),
-						//								HexString.toLong(findedDestinationMAC), vlan);
 
 						if (outPort == null) {
 
@@ -520,27 +515,6 @@ public final class OFMArpControl extends OFModule {
 						} catch (Exception e) {
 							System.out.println(e + " outPort : " + outPort);
 						}
-						//						if (LEARNING_SWITCH_REVERSE_FLOW) {
-						//							this.writeFlowMod(
-						//									conn.getSwitch(),
-						//									OFFlowMod.OFPFC_ADD,
-						//									-1,
-						//									match.clone()
-						//									.setDataLayerSource(
-						//											match.getDataLayerDestination())
-						//											.setDataLayerDestination(
-						//													match.getDataLayerSource())
-						//													.setNetworkSource(
-						//															match.getNetworkDestination())
-						//															.setNetworkDestination(
-						//																	match.getNetworkSource())
-						//																	.setTransportSource(
-						//																			match.getTransportDestination())
-						//																			.setTransportDestination(
-						//																					match.getTransportSource())
-						//																					.setInputPort(outPort), match
-						//																					.getInputPort(), out);
-						//						}
 						this.writePacketOutForPacketIn(destSW, pi,
 								outPort, out);
 					}
@@ -549,11 +523,35 @@ public final class OFMArpControl extends OFModule {
 			}
 			// gratuitous ARP msg
 			else {
+				boolean isMACinTable = false;
+				for (String ip : arptable.keySet()) {
+					// MAC is in arp table now
+					if(sMAC.equals(lookupARPTable(ip))){
+						// case 1 : requesting MAC & IP is already in table
+						if(sIP.equals(ip)){
+							this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
+							// refresh the age
+							return true;
+						}
+						// case 2 : requesting IP is different from the original one.
+						else{
+							
+							return true;
+						}
+					}
+							
+				}
+				// case 3 : No mac in table 
+				this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
+				addToARPTable(sIP, sMAC);                                                              
 			}
 
 		}
 		// Not an ARP msg
 		else{
+			// ICMP msg of GARP
+			
+			// else
 			// Now output flow-mod and/or packet
 			Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
 			if (outPort == null) {
