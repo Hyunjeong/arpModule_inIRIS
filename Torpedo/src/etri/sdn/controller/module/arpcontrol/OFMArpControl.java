@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.openflow.protocol.OFFlowMod;
@@ -48,9 +50,17 @@ public final class OFMArpControl extends OFModule {
 	 * Table to save learning result.
 	 */
 	private Map<IOFSwitch, Map<MacVlanPair, Short>> macVlanToSwitchPortMap = new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair, Short>>();
-	private static Map<Long, IOFSwitch> requestHostList = new ConcurrentHashMap<Long, IOFSwitch>();
-	public static Map<String, Object> arptable = new HashMap<String, Object>();
+	//	private static Map<Long, IOFSwitch> requestHostList = new ConcurrentHashMap<Long, IOFSwitch>();
+
+	public static Map<Map<String, String>, Integer> arptable = new ConcurrentHashMap<Map<String,String>, Integer>();
+	public static Map<String, Object> garpRequestTable = new HashMap<String, Object>();
+
 	byte[] contorllerMac = null;
+
+	Timer timer = new Timer();
+
+	private static final int ARPENTRY_AGE_TEST_PERIOD = 1000;	// ms
+	private static final int ARPENTRY_AGE = 300000;	// ms, 5 min
 
 	// flow-mod - for use in the cookie
 	private static final int LEARNING_SWITCH_APP_ID = 1;
@@ -98,6 +108,22 @@ public final class OFMArpControl extends OFModule {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
+
+		timer.scheduleAtFixedRate(new TimerTask() {
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				for(Map<String, String> entry : arptable.keySet()){
+					int newAge = arptable.get(entry);
+					if(newAge <= ARPENTRY_AGE)
+						arptable.remove(entry);
+					else{
+						newAge -= ARPENTRY_AGE_TEST_PERIOD;
+						arptable.put(entry, newAge);
+					}
+				}
+			}
+		}, 0, ARPENTRY_AGE_TEST_PERIOD);
 	}
 
 	@Override
@@ -114,16 +140,34 @@ public final class OFMArpControl extends OFModule {
 	}
 
 	private void addToARPTable(String IP, String MAC) {
-		arptable.put(IP, MAC);
+		Map<String, String> entry = new ConcurrentHashMap<String, String>();
+		entry.put(IP, MAC);
+		arptable.put(entry, ARPENTRY_AGE);
 		//		System.out.println("Add to Table: " + IP + " " + MAC);
 	}
 
 	private String lookupARPTable(String destinationIP) {
-		if (arptable.containsKey(destinationIP)) {
-			String destMAC = (String) arptable.get(destinationIP);
-			return destMAC;
+		for(Map<String, String> entry : arptable.keySet()){
+			if (entry.containsKey(destinationIP)) {
+				String destMAC = (String) entry.get(destinationIP);
+				return destMAC;
+			} else
+				break;
+		}
+		return "";
+	}
+
+	private void addToGARPTable(String IP, String MAC) {
+		garpRequestTable.put(IP, MAC);
+		//		System.out.println("Add to Table: " + IP + " " + MAC);
+	}
+
+	private boolean lookupGARPTable(String destinationIP) {
+		if (garpRequestTable.containsKey(destinationIP)) {
+			garpRequestTable.remove(destinationIP);
+			return true;
 		} else
-			return "";
+			return false;
 	}
 
 	/**
@@ -462,7 +506,7 @@ public final class OFMArpControl extends OFModule {
 									pi.setPacketData(packetData),
 									OFPort.OFPP_IN_PORT.getValue(), out);
 
-							System.out.print(dIP + "\t" + findedDestinationMAC+ "\t" + sIP + "\t" + sMAC + "\n");
+							//							System.out.print(dIP + "\t" + findedDestinationMAC+ "\t" + sIP + "\t" + sMAC + "\n");
 						}
 					}
 
@@ -470,7 +514,7 @@ public final class OFMArpControl extends OFModule {
 					else {
 						//						System.out.println("★ " + "Miss!! Requesting Source : " + sIP + " Replying Source : " + dIP);
 						// request msg를 브로드캐스트
-						requestHostList.put(sourceMac, conn.getSwitch());
+						//						requestHostList.put(sourceMac, conn.getSwitch());
 						this.writePacketOutForPacketIn(conn.getSwitch(), pi,
 								OFPort.OFPP_FLOOD.getValue(), out);
 					}
@@ -523,34 +567,37 @@ public final class OFMArpControl extends OFModule {
 			}
 			// gratuitous ARP msg
 			else {
-				boolean isMACinTable = false;
-				for (String ip : arptable.keySet()) {
-					// MAC is in arp table now
-					if(sMAC.equals(lookupARPTable(ip))){
-						// case 1 : requesting MAC & IP is already in table
-						if(sIP.equals(ip)){
-							this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
-							// refresh the age
-							return true;
-						}
-						// case 2 : requesting IP is different from the original one.
-						else{
-							
-							return true;
-						}
-					}
-							
-				}
-				// case 3 : No mac in table 
+				addToARPTable(sIP, sMAC);  
 				this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
-				addToARPTable(sIP, sMAC);                                                              
+				//				
+				//				boolean isMACinTable = false;
+				//				for (String ip : arptable.keySet()) {
+				//					// MAC is in arp table now
+				//					if(sMAC.equals(lookupARPTable(ip))){
+				//						// case 1 : requesting MAC & IP is already in table
+				//						if(sIP.equals(ip)){
+				//							this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
+				//							// refresh the age
+				//							return true;
+				//						}
+				//						// case 2 : requesting IP is different from the original one.
+				//						else{
+				//							addToARPTable(sIP, sMAC);
+				//							this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
+				//							return true;
+				//						}
+				//					}
+				//				}
+				//				// case 3 : No mac in table 
+				//				this.writePacketOutForPacketIn(conn.getSwitch(), pi,OFPort.OFPP_FLOOD.getValue(), out);
+				//				addToARPTable(sIP, sMAC);                                                              
 			}
 
 		}
 		// Not an ARP msg
 		else{
 			// ICMP msg of GARP
-			
+
 			// else
 			// Now output flow-mod and/or packet
 			Short outPort = getFromPortMap(conn.getSwitch(), destMac, vlan);
