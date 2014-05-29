@@ -52,7 +52,7 @@ public final class OFMArpControl extends OFModule {
 	private Map<IOFSwitch, Map<MacVlanPair, Short>> macVlanToSwitchPortMap = new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair, Short>>();
 	//	private static Map<Long, IOFSwitch> requestHostList = new ConcurrentHashMap<Long, IOFSwitch>();
 
-	public static Map<Map<String, String>, Integer> arptable = new ConcurrentHashMap<Map<String,String>, Integer>();
+	public static Map<ARPPair, Integer> arptable = new ConcurrentHashMap<ARPPair, Integer>();
 	public static Map<String, Object> garpRequestTable = new HashMap<String, Object>();
 
 	byte[] contorllerMac = null;
@@ -113,14 +113,12 @@ public final class OFMArpControl extends OFModule {
 			@Override
 			public void run() {
 				// TODO Auto-generated method stub
-				for(Map<String, String> entry : arptable.keySet()){
+				for(ARPPair entry : arptable.keySet()){
 					int newAge = arptable.get(entry);
-					if(newAge <= ARPENTRY_AGE)
-						arptable.remove(entry);
-					else{
 						newAge -= ARPENTRY_AGE_TEST_PERIOD;
 						arptable.put(entry, newAge);
-					}
+					if(newAge <= 0)
+						arptable.remove(entry);
 				}
 			}
 		}, 0, ARPENTRY_AGE_TEST_PERIOD);
@@ -140,35 +138,42 @@ public final class OFMArpControl extends OFModule {
 	}
 
 	private void addToARPTable(String IP, String MAC) {
-		Map<String, String> entry = new ConcurrentHashMap<String, String>();
-		entry.put(IP, MAC);
+		for(ARPPair e : arptable.keySet()){
+			if(e.ip.equals(IP)){
+				return;
+			}
+		}
+		ARPPair entry = new ARPPair(IP, MAC);
 		arptable.put(entry, ARPENTRY_AGE);
-		//		System.out.println("Add to Table: " + IP + " " + MAC);
 	}
 
 	private String lookupARPTable(String destinationIP) {
-		for(Map<String, String> entry : arptable.keySet()){
-			if (entry.containsKey(destinationIP)) {
-				String destMAC = (String) entry.get(destinationIP);
+		for(ARPPair entry : arptable.keySet()){
+			if (entry.ip.equals(destinationIP)) {
+				String destMAC = entry.mac;
+				System.out.println("return " + destMAC);
 				return destMAC;
-			} else
-				break;
+			}
+		}
+		System.out.println("No result for "+ destinationIP);
+		for(ARPPair e : arptable.keySet()){
+			System.out.println(e.ip + " " + e.mac + " " + arptable.get(e));
 		}
 		return "";
 	}
 
-	private void addToGARPTable(String IP, String MAC) {
-		garpRequestTable.put(IP, MAC);
-		//		System.out.println("Add to Table: " + IP + " " + MAC);
-	}
-
-	private boolean lookupGARPTable(String destinationIP) {
-		if (garpRequestTable.containsKey(destinationIP)) {
-			garpRequestTable.remove(destinationIP);
-			return true;
-		} else
-			return false;
-	}
+//	private void addToGARPTable(String IP, String MAC) {
+//		garpRequestTable.put(IP, MAC);
+//		//		System.out.println("Add to Table: " + IP + " " + MAC);
+//	}
+//
+//	private boolean lookupGARPTable(String destinationIP) {
+//		if (garpRequestTable.containsKey(destinationIP)) {
+//			garpRequestTable.remove(destinationIP);
+//			return true;
+//		} else
+//			return false;
+//	}
 
 	/**
 	 * Writes an OFPacketOut message to a switch.
