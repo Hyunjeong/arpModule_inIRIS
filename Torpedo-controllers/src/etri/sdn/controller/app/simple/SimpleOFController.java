@@ -46,7 +46,7 @@ public class SimpleOFController extends OFController {
 	private OFMDeviceManager m_device_manager = new OFMDeviceManager();
 	private OFMStateManager m_state_manager = new OFMStateManager();
 	private OFMStaticFlowEntryPusher m_static_entry_pusher = new OFMStaticFlowEntryPusher();
-	private OFMStorageManager m_storage_manager = new OFMStorageManager();
+//	private OFMStorageManager m_storage_manager = new OFMStorageManager();
 	
 	private OFModule[] packet_in_pipeline = { 
 			m_learning_mac,
@@ -74,7 +74,7 @@ public class SimpleOFController extends OFController {
 		m_state_manager.init(this);			// this is not a part of the pipeline.
 		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.
 		m_user_interface.init(this);		// this is not a part of the pipeline.
-		m_storage_manager.init(this);		// this is not a part of the pipeline.
+//		m_storage_manager.init(this);		// this is not a part of the pipeline.
 	}
 
 	/**

@@ -86,7 +86,7 @@ public class ARPServerOFController extends OFController {
 		m_state_manager.init(this);			// this is not a part of the pipeline.
 		m_static_entry_pusher.init(this);	// this is not a part of the pipeline.//
 		m_user_interface.init(this);		// this is not a part of the pipeline.
-		m_storage_manager.init(this);		// this is not a part of the pipeline.
+	//	m_storage_manager.init(this);		// this is not a part of the pipeline.
 	}
 
 	/**
